@@ -34,11 +34,12 @@ public class AddWeightActivity extends AppCompatActivity {
         weightInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView textView, int actionId, KeyEvent keyEvent) {
-                if(actionId == EditorInfo.IME_ACTION_DONE){
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
                     addWeightAndFinish();
-                    return true;
                 }
-                return false;
+
+                // true -> we consumed the click
+                return true;
             }
         });
 
@@ -49,15 +50,32 @@ public class AddWeightActivity extends AppCompatActivity {
         imm.showSoftInput(weightInput, InputMethodManager.SHOW_FORCED);
         */
         weightInput.requestFocus();
-        getWindow().setSoftInputMode (WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+    }
+
+    public boolean isWeightValueValid(String weight) {
+        return weight.length() > 0 && isNumeric(weight);
+    }
+
+    public boolean isNumeric(String str) {
+        try {
+            Double.parseDouble(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     private void addWeightAndFinish() {
         String weight = weightInput.getText().toString();
-        long timestamp = System.currentTimeMillis() / 1000L;
+        if (isWeightValueValid(weight)) {
+            long timestamp = System.currentTimeMillis() / 1000L;
 
-        storeEntry(weight, timestamp);
-        AddWeightActivity.this.finish();
+            storeEntry(weight, timestamp);
+            AddWeightActivity.this.finish();
+        } else {
+            weightInput.setError("Incorrect weight");
+        }
     }
 
     private void storeEntry(String value, Long timestamp) {

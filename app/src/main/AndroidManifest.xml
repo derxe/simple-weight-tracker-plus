@@ -12,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity
-            android:label="New Weight:"
+            android:label="Add new weight:"
             android:name=".AddWeightActivity"
             android:theme="@style/AppDialogTheme" />
 
@@ -29,7 +29,7 @@
 
         <provider
             android:name=".WeightsValueProvider"
-            android:authorities="com.doubleblacksoftware.tracker"></provider>
+            android:authorities="com.simpleweighttracker.tracker" />
 
         <receiver android:name=".SimpleWidgetProvider">
             <intent-filter>

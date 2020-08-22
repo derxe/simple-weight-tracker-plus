@@ -20,7 +20,7 @@ import java.util.HashMap;
 
 public class WeightsValueProvider extends ContentProvider {
     // fields for my content provider
-    static final String PROVIDER_NAME = "com.doubleblacksoftware.tracker";
+    static final String PROVIDER_NAME = "com.simpleweighttracker.tracker";
     static final String URL = "content://" + PROVIDER_NAME + "/values";
     static final Uri CONTENT_URI = Uri.parse(URL);
 
