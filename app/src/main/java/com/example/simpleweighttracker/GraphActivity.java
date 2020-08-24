@@ -126,7 +126,7 @@ public class GraphActivity extends AppCompatActivity {
         Collections.sort(values, new Comparator<Entry>() {
             @Override
             public int compare(Entry e1, Entry e2) {
-                return (int) (e1.getX() - e2.getX());
+                return (int) (e2.getX() - e1.getX());
             }
         });
 

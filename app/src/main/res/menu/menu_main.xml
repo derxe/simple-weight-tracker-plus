@@ -12,4 +12,9 @@
         android:title="Export to csv"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/import_csv"
+        android:title="Import csv"
+        app:showAsAction="never" />
+
 </menu>

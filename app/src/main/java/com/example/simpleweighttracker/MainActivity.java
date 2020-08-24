@@ -10,6 +10,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -28,6 +30,8 @@ import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
 
 import android.os.Environment;
+import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.InputType;
 import android.view.LayoutInflater;
@@ -44,15 +48,20 @@ import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 
+import net.rdrei.android.dirchooser.DirectoryChooserActivity;
+import net.rdrei.android.dirchooser.DirectoryChooserConfig;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
@@ -169,16 +178,171 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         // as you specify a parent activity in AndroidManifest.xml.
         int id = item.getItemId();
 
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.export_csv) {
-            exportToSdCard();
-            return true;
+        switch(item.getItemId()) {
+            case R.id.export_csv:
+                if(hasWritePermission())
+                    userSelectDirectory();
+                return true;
+
+            case R.id.import_csv:
+                if(hasWritePermission())
+                    userSelectFile();
+                return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
+    // request codes
+    public static int USER_SELECT_DIRECTORY_RC = 1;
+    public static int USER_SELECT_FILE_RC = 2;
 
+    private void userSelectDirectory() {
+        Uri downloadsUri = Uri.fromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/pdf");
+            intent.putExtra(Intent.EXTRA_TITLE, "weights.csv");
+
+            // Optionally, specify a URI for the directory that should be opened in
+            // the system file picker when your app creates the document.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, downloadsUri);
+            }
+
+            startActivityForResult(intent, USER_SELECT_DIRECTORY_RC);
+        } else {
+            Intent intent = new Intent();
+            intent.setData(downloadsUri);
+            onActivityResult(USER_SELECT_DIRECTORY_RC, RESULT_OK, intent);
+        }
+    }
+
+    private void userSelectFile() {
+        Intent intent = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            intent = new Intent()
+                    .setType("*/*")
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setAction(Intent.ACTION_OPEN_DOCUMENT);
+
+        } else {
+            intent = new Intent()
+                    .setType("*/*")
+                    .setAction(Intent.ACTION_GET_CONTENT);
+        }
+
+        startActivityForResult(intent, USER_SELECT_FILE_RC);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if(requestCode == USER_SELECT_FILE_RC && resultCode == RESULT_OK) {
+            Uri selectedFile = data.getData(); //The uri with the location of the file
+            Toast.makeText(this, "Selected file: " + selectedFile, Toast.LENGTH_LONG).show();
+            importCSV(selectedFile);
+        }
+
+        if(requestCode == USER_SELECT_DIRECTORY_RC && resultCode == RESULT_OK) {
+            Uri selectedFile = data.getData(); //The uri with the location of the file
+            Toast.makeText(this, "Selected file: " + selectedFile, Toast.LENGTH_LONG).show();
+            exportCSV(selectedFile);
+        }
+    }
+
+    public void exportCSV(Uri fileUri) {
+        try {
+            FileOutputStream f = (FileOutputStream) getContentResolver().openOutputStream(fileUri);
+            assert f != null;
+
+            Cursor cursor = getContentResolver().query(
+                    WeightsValueProvider.CONTENT_URI, new String[] {
+                            "value", "timestamp"
+                    }, null, null, "timestamp");
+            assert cursor != null;
+
+            Calendar cal = Calendar.getInstance();
+            SimpleDateFormat sdf = new SimpleDateFormat(format, Locale.getDefault());
+
+            for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
+                long time = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000L;
+                cal.setTimeInMillis(time);
+                String timestamp = sdf.format(cal.getTime());
+                String value = cursor.getString(cursor.getColumnIndex("value"));
+                String line = timestamp + "," + value + "\n";
+
+                f.write(line.getBytes());
+                cursor.moveToNext();
+            }
+            f.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void importCSV(Uri fileUri) {
+        try {
+            FileInputStream f = (FileInputStream) getContentResolver().openInputStream(fileUri);
+            assert f != null;
+
+            final List<String[]> resultList = new ArrayList();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(f));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] row = line.split(",");
+                resultList.add(row);
+            }
+            f.close();
+
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle("Import records?")
+                    .setMessage("Found " + resultList.size() + " records to import.  This will delete any records already in the app.")
+                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int whichButton) {
+                            importEntries(resultList);
+                        }
+                    }).setNegativeButton("Cancel", null).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private void importEntries(List<String[]> entries) {
+        // Delete all records in app
+        getContentResolver().delete(
+                WeightsValueProvider.CONTENT_URI, null, null);
+
+        // Add all the new records
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format, Locale.getDefault());
+        for (String[] entry : entries) {
+            try {
+                String weight = entry[1];
+                Long timestamp =  dateFormat.parse(entry[0]).getTime() / 1000;
+                storeEntry(weight, timestamp);
+            } catch (Exception e) {
+                Toast.makeText(MainActivity.this,
+                        "Error: couldn't parse " + Arrays.toString(entry),
+                        Toast.LENGTH_LONG).show();
+            }
+        }
+
+        Toast.makeText(MainActivity.this, "Import succeeded!", Toast.LENGTH_LONG).show();
+    }
+
+    private void storeEntry(String value, Long timestamp) {
+        ContentValues values = new ContentValues();
+        values.put(WeightsValueProvider.VALUE, value);
+        values.put(WeightsValueProvider.TIMESTAMP, timestamp);
+        getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
+    }
+
+    public boolean hasWritePermission() {
+        return hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, STORAGE_PERMISSION_CODE);
+    }
 
     // Function to check and request permission
     public boolean hasPermission(String permission, int requestCode)
@@ -247,21 +411,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     }
 
     public void exportToSdCard() {
-        if(!hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, STORAGE_PERMISSION_CODE))
-            return;
 
-        File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        File file = new File(dir, export_filename);
-        FileOutputStream f;
-        try {
-            boolean created = file.createNewFile();
-            f = new FileOutputStream(file);
-            f.write(getCsvFile().getBytes());
-            f.close();
-            Toast.makeText(this, "Success?", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+
     }
 
     public List<String[]> readCsvFile(File file) throws IOException {
