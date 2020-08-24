@@ -78,8 +78,15 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                //startActivity(new Intent(MainActivity.this, AddWeightActivity.class));
+                startActivity(new Intent(MainActivity.this, AddWeightActivity.class));
+            }
+        });
+
+        fab.setOnLongClickListener(new View.OnLongClickListener() {
+            @Override
+            public boolean onLongClick(View view) {
                 startActivity(new Intent(MainActivity.this, GraphActivity.class));
+                return true;
             }
         });
 

@@ -2,8 +2,10 @@ package com.example.simpleweighttracker;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
@@ -15,8 +17,11 @@ import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.utils.ColorTemplate;
 
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
@@ -61,18 +66,21 @@ public class GraphActivity extends AppCompatActivity {
         xAxis.setTextColor(Color.WHITE);
         xAxis.setDrawAxisLine(false);
         xAxis.setDrawGridLines(true);
-        xAxis.setTextColor(Color.rgb(255, 192, 56));
+        xAxis.setTextColor(Color.BLACK);
         xAxis.setCenterAxisLabels(true);
         xAxis.setGranularity(1f); // one hour
         xAxis.setValueFormatter(new ValueFormatter() {
 
             private final SimpleDateFormat mFormat = new SimpleDateFormat("dd MMM HH:mm", Locale.ENGLISH);
 
+            Locale locale = new Locale("de");
+            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
+
             @Override
             public String getFormattedValue(float value) {
-
-                long millis = TimeUnit.HOURS.toMillis((long) value);
-                return mFormat.format(new Date(millis));
+                long millis = TimeUnit.MINUTES.toMillis((long) value);
+                return "";//dateFormat.format(new Date(millis));
+                // return mFormat.format(new Date(millis));
             }
         });
 
@@ -81,10 +89,15 @@ public class GraphActivity extends AppCompatActivity {
         leftAxis.setTextColor(ColorTemplate.getHoloBlue());
         leftAxis.setDrawGridLines(true);
         leftAxis.setGranularityEnabled(true);
-        leftAxis.setAxisMinimum(0f);
-        leftAxis.setAxisMaximum(170f);
         leftAxis.setYOffset(-9f);
-        leftAxis.setTextColor(Color.rgb(255, 192, 56));
+        leftAxis.setTextColor(Color.BLACK);
+        leftAxis.setValueFormatter(new ValueFormatter() {
+
+            @Override
+            public String getFormattedValue(float value) {
+                return Math.round(value) + " kg";
+            }
+        });
 
         YAxis rightAxis = chart.getAxisRight();
         rightAxis.setEnabled(false);
@@ -93,21 +106,34 @@ public class GraphActivity extends AppCompatActivity {
     }
 
     private void setData(int count) {
-
-        // now in hours
-        long now = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis());
-
         ArrayList<Entry> values = new ArrayList<>();
+        Cursor cursor = getContentResolver().query(
+                WeightsValueProvider.CONTENT_URI, new String[] {
+                        "value", "timestamp"
+                }, null, null, "timestamp");
+        assert cursor != null;
 
-        // count = hours
-        float to = now + count;
-
-        // increment by 1 hour
-        for (float x = now; x < to; x++) {
-
-            float y = (float) Math.sin(x) * 10 + 90;
-            values.add(new Entry(x, y)); // add one entry per hour
+        float x;
+        for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
+            float y = cursor.getFloat(cursor.getColumnIndex("value"));
+            long time = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000;
+            Log.d("Graph", "Time: " + time);
+            x = (float) TimeUnit.MILLISECONDS.toHours(time);
+            Log.d("Graph", "x:" + x + ", y:" + y);
+            values.add(new Entry(x , y)); // add one entry per hour
         }
+
+        Collections.sort(values, new Comparator<Entry>() {
+            @Override
+            public int compare(Entry e1, Entry e2) {
+                return (int) (e1.getX() - e2.getX());
+            }
+        });
+
+        for(Entry e : values) {
+            Log.d("Graph", "values: x:" + e.getX() + ", y:" + e.getY());
+        }
+
 
         // create a dataset and give it a type
         LineDataSet set1 = new LineDataSet(values, "DataSet 1");
