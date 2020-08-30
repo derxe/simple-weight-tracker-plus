@@ -1,7 +1,10 @@
 package com.example.simpleweighttracker;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.PreferenceManager;
 
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -80,17 +83,21 @@ public class GraphActivity extends AppCompatActivity {
         final YAxis ya = chart.getAxisLeft();
         ya.setTextSize(10f);
         ya.setDrawGridLines(true);
+
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        final String weight_unit = prefs.getString("weight_unit", "default");
         ya.setValueFormatter(new ValueFormatter() {
             @Override
             public String getFormattedValue(float value) {
-                return Math.round(value) + " kg ";
+                return Math.round(value) + " " + weight_unit;
             }
         });
 
         // CHART SETTINGS
         // scale so that last 5 days are visible
 
-        float scaleX = Math.max(1, chart.getXRange() / TimeUnit.DAYS.toSeconds(10));
+        float scaleX = Math.max(1, chart.getXRange() / TimeUnit.DAYS.toSeconds(6));
         chart.zoom(scaleX, 1, 0, 0);
         chart.moveViewToX(chart.getXChartMax()); // move chart far right
 

@@ -28,10 +28,12 @@ import androidx.cursoradapter.widget.CursorAdapter;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
+import androidx.preference.PreferenceManager;
 
 import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.Editable;
 import android.text.InputType;
 import android.util.Log;
@@ -80,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        PreferenceManager.setDefaultValues(this, R.xml.root_preferences, false);
 
         getSupportLoaderManager().initLoader(0, null, this);
 
@@ -99,6 +102,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
         listAdapter = new MyAdapter(this, null);
         listView.setAdapter(listAdapter);
+
     }
 
 
@@ -135,10 +139,15 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        Context context = MainActivity.this;
 
         switch(item.getItemId()) {
+            case R.id.settings:
+                startActivity(new Intent(context, SettingsActivity.class));
+                break;
+
             case R.id.open_graph:
-                startActivity(new Intent(MainActivity.this, GraphActivity.class));
+                startActivity(new Intent(context, GraphActivity.class));
                 break;
 
             case R.id.export_csv:

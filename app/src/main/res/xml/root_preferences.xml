@@ -1,0 +1,56 @@
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <ListPreference
+        app:defaultValue="1"
+        app:entries="@array/weights_units_entries"
+        app:entryValues="@array/weights_units_values"
+        app:key="weight_unitaa"
+        app:title="Weight Units"
+        app:useSimpleSummaryProvider="true" />
+
+    <PreferenceCategory app:title="Import/Export">
+
+        <EditTextPreference
+            app:defaultValue="M/dd/yy h:mm a"
+            app:key="format"
+            app:title="Date format"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreference
+            app:defaultValue="true"
+            app:key="use_default_locale"
+            app:summary="Don't use your system default locale"
+            app:title="Use custom locale" />
+
+        <EditTextPreference
+            app:defaultValue="en"
+            app:dependency="use_default_locale"
+            app:key="locale"
+            app:title="Date locale"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory app:title="About">
+
+        <Preference
+            app:selectable="false"
+            app:summary="Just a really simple weight tracking app :)" />
+
+        <Preference
+            app:summary="@string/versionName"
+            app:title="Version" />
+
+        <Preference
+            app:summary="https://github.com/derxe/simple-weight-tracker-plus"
+            app:title="Git repository">
+            <intent
+                android:action="android.intent.action.VIEW"
+                android:data="https://github.com/derxe/simple-weight-tracker-plus" />
+        </Preference>
+
+    </PreferenceCategory>
+
+
+</PreferenceScreen>

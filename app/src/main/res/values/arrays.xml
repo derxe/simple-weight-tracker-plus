@@ -1,0 +1,12 @@
+<resources>
+    <!-- Reply Preference -->
+    <string-array name="weights_units_entries">
+        <item>Kg</item>
+        <item>Pounds</item>
+    </string-array>
+
+    <string-array name="weights_units_values">
+        <item>kg</item>
+        <item>lbs</item>
+    </string-array>
+</resources>
