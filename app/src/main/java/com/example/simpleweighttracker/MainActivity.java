@@ -34,6 +34,7 @@ import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.InputType;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 
@@ -63,6 +64,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
@@ -91,13 +94,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             }
         });
 
-        fab.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View view) {
-                startActivity(new Intent(MainActivity.this, GraphActivity.class));
-                return true;
-            }
-        });
 
         ListView listView = findViewById(R.id.list);
 
@@ -127,41 +123,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         listAdapter.changeCursor(null);
     }
 
-    static int i = 0;
-    public class MyAdapter extends CursorAdapter {
-        private final LayoutInflater mInflater;
-
-        public MyAdapter(Context context, Cursor cursor) {
-            super(context, cursor, false);
-            mInflater = LayoutInflater.from(context);
-        }
-
-        @Override
-        public View newView(Context context, Cursor cursor, ViewGroup parent) {
-            return mInflater.inflate(R.layout.list_row, parent, false);
-        }
-
-
-        @Override
-        public void bindView(View view, Context context, Cursor cursor) {
-            // get the fields from the row
-            TextView weightLabel = view.findViewById(R.id.weight);
-            TextView timestampLabel = view.findViewById(R.id.timestamp);
-
-            // set value label
-            final String value = cursor.getString(cursor.getColumnIndex("value"));
-            weightLabel.setText(value);
-
-            // set the timestamp label
-            long timeMs = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000L;
-            Calendar cal = Calendar.getInstance();
-            cal.setTimeInMillis(timeMs);
-
-            Locale locale = new Locale("de");
-            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
-            timestampLabel.setText(dateFormat.format(cal.getTime()));
-        }
-    }
+    public static String format = "M/dd/yy h:mm a";
 
 
     @Override
@@ -173,24 +135,27 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
 
         switch(item.getItemId()) {
+            case R.id.open_graph:
+                startActivity(new Intent(MainActivity.this, GraphActivity.class));
+                break;
+
             case R.id.export_csv:
-                if(hasWritePermission())
+                if (hasWritePermission())
                     userSelectDirectory();
-                return true;
+                break;
 
             case R.id.import_csv:
-                if(hasWritePermission())
+                if (hasWritePermission())
                     userSelectFile();
-                return true;
+                break;
+
+            default:
+                return super.onOptionsItemSelected(item);
         }
 
-        return super.onOptionsItemSelected(item);
+        return true;
     }
 
     // request codes
@@ -203,7 +168,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("application/pdf");
+            intent.setType("text/csv");
             intent.putExtra(Intent.EXTRA_TITLE, "weights.csv");
 
             // Optionally, specify a URI for the directory that should be opened in
@@ -259,24 +224,28 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             assert f != null;
 
             Cursor cursor = getContentResolver().query(
-                    WeightsValueProvider.CONTENT_URI, new String[] {
+                    WeightsValueProvider.CONTENT_URI, new String[]{
                             "value", "timestamp"
-                    }, null, null, "timestamp");
+                    }, null, null, "timestamp ASC");
             assert cursor != null;
 
             Calendar cal = Calendar.getInstance();
             SimpleDateFormat sdf = new SimpleDateFormat(format, Locale.getDefault());
 
-            for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
-                long time = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000L;
+            int timestampIndex = cursor.getColumnIndex("timestamp");
+            int valueIndex = cursor.getColumnIndex("value");
+
+            while (cursor.moveToNext()) {
+                long time = cursor.getLong(timestampIndex) * 1000L;
                 cal.setTimeInMillis(time);
                 String timestamp = sdf.format(cal.getTime());
-                String value = cursor.getString(cursor.getColumnIndex("value"));
-                String line = timestamp + "," + value + "\n";
+                String value = cursor.getString(valueIndex);
+                String line = String.format("%s,%s\n", timestamp, value);
 
                 f.write(line.getBytes());
-                cursor.moveToNext();
             }
+
+            cursor.close();
             f.close();
         } catch (Exception e) {
             e.printStackTrace();
@@ -288,7 +257,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             FileInputStream f = (FileInputStream) getContentResolver().openInputStream(fileUri);
             assert f != null;
 
-            final List<String[]> resultList = new ArrayList();
+            final ArrayList<String[]> resultList = new ArrayList<>();
             BufferedReader reader = new BufferedReader(new InputStreamReader(f));
             String line;
             while ((line = reader.readLine()) != null) {
@@ -317,20 +286,57 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 WeightsValueProvider.CONTENT_URI, null, null);
 
         // Add all the new records
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format, Locale.getDefault());
+        int nInported = 0;
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format, new Locale("en"));
         for (String[] entry : entries) {
+            Log.d("Import", "Entry: " + Arrays.toString(entry));
             try {
                 String weight = entry[1];
-                Long timestamp =  dateFormat.parse(entry[0]).getTime() / 1000;
+                Long timestamp = dateFormat.parse(entry[0]).getTime() / 1000;
+                Log.d("Import", "weight: " + weight + " timestamp:" + timestamp);
                 storeEntry(weight, timestamp);
+                nInported++;
             } catch (Exception e) {
-                Toast.makeText(MainActivity.this,
-                        "Error: couldn't parse " + Arrays.toString(entry),
-                        Toast.LENGTH_LONG).show();
+                Log.e("Import", "Error: couldn't parse " + Arrays.toString(entry));
             }
         }
 
-        Toast.makeText(MainActivity.this, "Import succeeded!", Toast.LENGTH_LONG).show();
+        Toast.makeText(MainActivity.this, "Imported " + nInported + " entries!", Toast.LENGTH_LONG).show();
+    }
+
+    public static class MyAdapter extends CursorAdapter {
+        private final LayoutInflater mInflater;
+
+        public MyAdapter(Context context, Cursor cursor) {
+            super(context, cursor, false);
+            mInflater = LayoutInflater.from(context);
+        }
+
+        @Override
+        public View newView(Context context, Cursor cursor, ViewGroup parent) {
+            return mInflater.inflate(R.layout.list_row, parent, false);
+        }
+
+
+        @Override
+        public void bindView(View view, Context context, Cursor cursor) {
+            // get the fields from the row
+            TextView weightLabel = view.findViewById(R.id.weight);
+            TextView timestampLabel = view.findViewById(R.id.timestamp);
+
+            // set value label
+            final String value = cursor.getString(cursor.getColumnIndex("value"));
+            weightLabel.setText(value);
+
+            // set the timestamp label
+            long timeMs = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000L;
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(timeMs);
+
+            Locale locale = new Locale("de");
+            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
+            timestampLabel.setText(dateFormat.format(cal.getTime()));
+        }
     }
 
     private void storeEntry(String value, Long timestamp) {
@@ -347,7 +353,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     // Function to check and request permission
     public boolean hasPermission(String permission, int requestCode)
     {
-
         // Checking if permission is not granted
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_DENIED) {
             ActivityCompat.requestPermissions(
@@ -383,92 +388,4 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
-
-    private String export_filename="moj1.csv";
-    public static String format = "M/dd/yy h:mm a";
-
-    public String getCsvFile() {
-        StringBuilder sb = new StringBuilder();
-
-        Cursor cursor = getContentResolver().query(
-                WeightsValueProvider.CONTENT_URI, new String[] {
-                        "value", "timestamp"
-                }, null, null, "timestamp");
-        assert cursor != null;
-
-        Calendar cal = Calendar.getInstance();
-        SimpleDateFormat sdf = new SimpleDateFormat(format);
-
-        for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
-            long time = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000L;
-            cal.setTimeInMillis(time);
-            String timestamp = sdf.format(cal.getTime());
-
-            String value = cursor.getString(cursor.getColumnIndex("value"));
-            sb.append(timestamp).append(",").append(value).append("\n");
-        }
-        return sb.toString();
-    }
-
-    public void exportToSdCard() {
-
-
-    }
-
-    public List<String[]> readCsvFile(File file) throws IOException {
-        FileInputStream f = new FileInputStream(file);
-        final List<String[]> resultList = new ArrayList();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(f));
-        String line;
-        while ((line = reader.readLine()) != null) {
-            String[] row = line.split(",");
-            resultList.add(row);
-        }
-        f.close();
-
-        return resultList;
-    }
-
-
-    public void importFromSdCard() {
-        File sdCard = Environment.getExternalStorageDirectory();
-        File dir = new File (sdCard.getAbsolutePath());
-        File file = new File(dir, export_filename);
-
-        getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
-
-        if (file.exists()) {
-
-            try {
-                final List<String[]> resultList = readCsvFile(file);
-                new androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("Import records?")
-                        .setMessage("Found " + resultList.size() + " records to import.  This will delete any records already in the app.")
-                        .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                            public void onClick(DialogInterface dialog, int whichButton) {
-                                // Delete all records in app
-                                getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
-
-                                // Add all the new records
-                                SimpleDateFormat dateFormat = new SimpleDateFormat(format);
-                                for (String[] row : resultList) {
-                                    try {
-                                        //storeEntry(row[1], dateFormat.parse(row[0]).getTime() / 1000);
-                                    } catch (Exception e) {
-                                        Toast.makeText(MainActivity.this, "Error: couldn't parse " + row[0], Toast.LENGTH_LONG).show();
-                                    }
-                                }
-                                Toast.makeText(MainActivity.this, "Import succeeded!", Toast.LENGTH_LONG).show();
-                            }
-                        }).setNegativeButton("Cancel", null).show();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("Import Instructions")
-                    .setMessage("Create a CSV file in the root of the SD card named " + export_filename + " containing a column with the date and time in format " + format + ", and a column with the weight.")
-                    .setPositiveButton("Ok", null).show();
-        }
-    }
 }

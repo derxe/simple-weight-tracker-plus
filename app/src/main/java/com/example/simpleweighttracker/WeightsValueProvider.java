@@ -102,13 +102,16 @@ public class WeightsValueProvider extends ContentProvider {
                 queryBuilder.setProjectionMap(ValueMap);
                 break;
             case VALUE_ID:
-                queryBuilder.appendWhere( ID + "=" + uri.getLastPathSegment());
+                queryBuilder.appendWhere(ID + "=" + uri.getLastPathSegment());
                 break;
             default:
                 throw new IllegalArgumentException("Unknown URI " + uri);
         }
 
-        sortOrder = TIMESTAMP + " desc";
+        if (sortOrder == null) {
+            sortOrder = TIMESTAMP + " desc";
+        }
+
         Cursor cursor = queryBuilder.query(database, projection, selection,
                 selectionArgs, null, null, sortOrder);
 

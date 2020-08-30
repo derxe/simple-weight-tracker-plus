@@ -3,8 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.example.simpleweighttracker.MainActivity">
     <item
-        android:id="@+id/export_share"
-        android:title="Share"
+        android:id="@+id/open_graph"
+        android:title="Graph"
         app:showAsAction="never" />
 
     <item
