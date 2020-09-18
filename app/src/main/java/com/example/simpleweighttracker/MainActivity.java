@@ -1,6 +1,7 @@
 package com.example.simpleweighttracker;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
@@ -8,6 +9,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
@@ -21,6 +23,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -71,6 +74,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+
+import static androidx.appcompat.app.AlertDialog.*;
 
 
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
@@ -194,8 +199,24 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
+    public static void setTheme(Context context) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        boolean dark = prefs.getBoolean("dark_theme", false);
+        context.setTheme(dark ? R.style.AppThemeRedDark : R.style.AppThemeRed);
+
+        if (dark) {
+            AppCompatDelegate.setDefaultNightMode(
+                    AppCompatDelegate.MODE_NIGHT_YES);
+        } else {
+            AppCompatDelegate.setDefaultNightMode(
+                    AppCompatDelegate.MODE_NIGHT_NO);
+        }
+    }
+
+
     private void userSelectFile() {
         Intent intent = null;
+        // get
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             intent = new Intent()
                     .setType("*/*")
@@ -261,42 +282,120 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
+    private static class WeightEntry {
+        float weight;
+        long timestamp;
+
+        WeightEntry(float weight, long timestamp) {
+            this.weight = weight;
+            this.timestamp = timestamp;
+        }
+    }
+
+
+    @SuppressLint("DefaultLocale")
     public void importCSV(Uri fileUri) {
+        // CSV file reading properties
+        final String CSV_SEPARATOR = ",";
+        Locale locale = new Locale("de");
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format, locale);
+
+        final ArrayList<WeightEntry> resultList = new ArrayList<>();
+        final StringBuilder logs = new StringBuilder();
+        logs.append(String.format("Locale used: '%s', date format: '%s'\n", locale, format));
+        int linesRead = 0;
+
         try {
             FileInputStream f = (FileInputStream) getContentResolver().openInputStream(fileUri);
             assert f != null;
-
-            final ArrayList<String[]> resultList = new ArrayList<>();
             BufferedReader reader = new BufferedReader(new InputStreamReader(f));
+
             String line;
             while ((line = reader.readLine()) != null) {
-                String[] row = line.split(",");
-                resultList.add(row);
+                linesRead++;
+
+                if (!line.contains(CSV_SEPARATOR)) {
+                    // csv separator doesn't exist this is not a CSV line, ignore it
+                    logs.append(String.format("Error on line %d: Unable to find CSV_SEPARATOR: '%s'. Ignoring line. Line: '%s'\n",
+                            linesRead, CSV_SEPARATOR, line));
+                } else {
+                    // read weight and timestamp from the line
+                    String[] row = line.split(CSV_SEPARATOR);
+
+                    long timestamp;
+                    try {
+                        float weight = Float.parseFloat(row[1]);
+                        timestamp = dateFormat.parse(row[0]).getTime() / 1000;
+                        resultList.add(new WeightEntry(weight, timestamp));
+                        logs.append(String.format("Line %d success. weight:'%.2f' timestamp:'%d'\n", linesRead, weight, timestamp));
+                    } catch (Exception e) {
+                        String error = String.format("Error on line: %d. Line: '%s', Error: %s\n",
+                                linesRead, Arrays.toString(row), e);
+                        logs.append(error);
+                        Log.e("Import", error);
+                    }
+                }
             }
             f.close();
 
-            new androidx.appcompat.app.AlertDialog.Builder(this)
-                    .setTitle("Import records?")
-                    .setMessage("Found " + resultList.size() + " records to import.  This will delete any records already in the app.")
-                    .setPositiveButton("Yes", new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int whichButton) {
-                            importEntries(resultList);
-                        }
-                    }).setNegativeButton("Cancel", null).show();
         } catch (Exception e) {
             e.printStackTrace();
+            logs.append(String.format("Error while reading file: %s\n", e));
         }
 
+        Builder b = new Builder(this);
+        b.setTitle("Import records");
+        b.setNegativeButton("Cancel", new OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialogInterface, int i) {
+
+            }
+        });
+
+        if (resultList.size() <= 0) {
+            // no entries to import
+            b.setMessage(String.format("Read %d lines but found NO entries to import.", linesRead));
+        } else {
+            b.setMessage(String.format(
+                    "Read %d lines and found %d entries to import. " +
+                    "This will delete any records already in the app.",
+                    linesRead, resultList.size()));
+
+            b.setPositiveButton("Import", new OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    // Delete all records in app
+                    getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
+
+                    for (WeightEntry e : resultList) {
+                        storeEntry(e.weight+"", e.timestamp);
+                    }
+                }
+            });
+        }
+
+        if(resultList.size() < linesRead) {
+            // there have been some lines that parser was unable to read
+            // give a user an option to show those errors.
+            b.setNeutralButton("Show logs", new OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    for(String errLine : logs.toString().split("\n")) {
+                        Log.d("import", errLine);
+                    }
+                }
+            });
+        }
+        b.show();
     }
 
+
     private void importEntries(List<String[]> entries) {
-        // Delete all records in app
-        getContentResolver().delete(
-                WeightsValueProvider.CONTENT_URI, null, null);
+
 
         // Add all the new records
         int nInported = 0;
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format, new Locale("en"));
+        SimpleDateFormat dateFormat = new SimpleDateFormat(format, new Locale("de"));
         for (String[] entry : entries) {
             Log.d("Import", "Entry: " + Arrays.toString(entry));
             try {
@@ -306,7 +405,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                 storeEntry(weight, timestamp);
                 nInported++;
             } catch (Exception e) {
-                Log.e("Import", "Error: couldn't parse " + Arrays.toString(entry));
+                Log.e("Import", "Error: couldn't parse " + Arrays.toString(entry) + " Error: " + e);
             }
         }
 

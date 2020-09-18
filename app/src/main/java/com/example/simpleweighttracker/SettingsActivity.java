@@ -30,7 +30,7 @@ public class SettingsActivity extends AppCompatActivity {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
 
 //            findPreference("Some pref");
-//            EditTextPreference.SimpleSummaryProvider.getInstance()/
+           EditTextPreference.SimpleSummaryProvider.getInstance()
         }
     }
 }
