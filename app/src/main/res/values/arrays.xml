@@ -1,12 +1,41 @@
 <resources>
-    <!-- Reply Preference -->
-    <string-array name="weights_units_entries">
-        <item>Kg</item>
-        <item>Pounds</item>
-    </string-array>
 
-    <string-array name="weights_units_values">
+    <!-- Weight Units   -->
+    <string name="default_weight_unit_value" translatable="false">kg</string>
+    <string-array name="weights_units_values_list">
         <item>kg</item>
         <item>lbs</item>
     </string-array>
+    <string-array name="weights_units_description_list">
+        <item>@string/weight_units_kg_title</item>
+        <item>@string/weight_units_pounds_title</item>
+    </string-array>
+
+    <!-- Themes -->
+    <string name="light_theme_key" translatable="false">light_theme</string>
+    <string name="dark_theme_key" translatable="false">dark_theme</string>
+    <string name="black_theme_key" translatable="false">black_theme</string>
+    <string name="default_theme_value" translatable="false">light_theme</string>
+    <string-array name="theme_values_list" translatable="false">
+        <item>@string/light_theme_key</item>
+        <item>@string/dark_theme_key</item>
+        <item>@string/black_theme_key</item>
+    </string-array>
+    <string-array name="theme_description_list" translatable="false">
+        <item>@string/light_theme_title</item>
+        <item>@string/dark_theme_title</item>
+        <item>@string/black_theme_title</item>
+    </string-array>
+
+    <!-- Date locale  -->
+    <string name="default_date_locale_value" translatable="false">system</string>
+    <string-array name="date_locale_values_list">
+        <item>kg</item>
+        <item>lbs</item>
+    </string-array>
+    <string-array name="date_locale_description_list">
+        <item>@string/weight_units_kg_title</item>
+        <item>@string/weight_units_pounds_title</item>
+    </string-array>
+
 </resources>

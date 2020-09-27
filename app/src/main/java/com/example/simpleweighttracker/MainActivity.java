@@ -27,6 +27,7 @@ import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.GravityCompat;
 import androidx.cursoradapter.widget.CursorAdapter;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
@@ -34,6 +35,8 @@ import androidx.loader.content.Loader;
 import androidx.preference.PreferenceManager;
 
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.provider.Settings;
@@ -79,6 +82,8 @@ import static androidx.appcompat.app.AlertDialog.*;
 
 
 public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
+    public static final boolean DEBUG = !BuildConfig.BUILD_TYPE.equals("release");
+    private static final String TAG = "MainActivity";
 
     private static final int STORAGE_PERMISSION_CODE = 123;
     MyAdapter listAdapter;
@@ -86,12 +91,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Utils.setTheme(this);
         setContentView(R.layout.activity_main);
         PreferenceManager.setDefaultValues(this, R.xml.root_preferences, false);
 
         getSupportLoaderManager().initLoader(0, null, this);
 
         Toolbar toolbar = findViewById(R.id.toolbar);
+//        toolbar.setPopupTheme(R.style.AppTheme);
         setSupportActionBar(toolbar);
 
         FloatingActionButton fab = findViewById(R.id.fab);
@@ -107,15 +114,19 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
         listAdapter = new MyAdapter(this, null);
         listView.setAdapter(listAdapter);
-
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Utils.updateTheme(this);
+    }
 
 
     @NonNull
     @Override
     public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
-        String[] projection = { "_id", "value", "timestamp" };
+        String[] projection = {"_id", "value", "timestamp"};
 
         CursorLoader cursorLoader = new CursorLoader(this,
                 WeightsValueProvider.CONTENT_URI, projection, null, null, null);
@@ -131,8 +142,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     public void onLoaderReset(@NonNull Loader<Cursor> loader) {
         listAdapter.changeCursor(null);
     }
-
-    public static String format = "M/dd/yy h:mm a";
 
 
     @Override
@@ -199,21 +208,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         }
     }
 
-    public static void setTheme(Context context) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        boolean dark = prefs.getBoolean("dark_theme", false);
-        context.setTheme(dark ? R.style.AppThemeRedDark : R.style.AppThemeRed);
-
-        if (dark) {
-            AppCompatDelegate.setDefaultNightMode(
-                    AppCompatDelegate.MODE_NIGHT_YES);
-        } else {
-            AppCompatDelegate.setDefaultNightMode(
-                    AppCompatDelegate.MODE_NIGHT_NO);
-        }
-    }
-
-
     private void userSelectFile() {
         Intent intent = null;
         // get
@@ -260,7 +254,9 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             assert cursor != null;
 
             Calendar cal = Calendar.getInstance();
-            SimpleDateFormat sdf = new SimpleDateFormat(format, Locale.getDefault());
+            Locale locale = Utils.getDateLocale(this);
+            String format = Utils.getDateFormat(this);
+            SimpleDateFormat sdf = new SimpleDateFormat(format, locale);
 
             int timestampIndex = cursor.getColumnIndex("timestamp");
             int valueIndex = cursor.getColumnIndex("value");
@@ -297,7 +293,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     public void importCSV(Uri fileUri) {
         // CSV file reading properties
         final String CSV_SEPARATOR = ",";
-        Locale locale = new Locale("de");
+        Locale locale = Utils.getDateLocale(this);
+        String format = Utils.getDateFormat(this);
         SimpleDateFormat dateFormat = new SimpleDateFormat(format, locale);
 
         final ArrayList<WeightEntry> resultList = new ArrayList<>();
@@ -356,10 +353,18 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             // no entries to import
             b.setMessage(String.format("Read %d lines but found NO entries to import.", linesRead));
         } else {
-            b.setMessage(String.format(
-                    "Read %d lines and found %d entries to import. " +
-                    "This will delete any records already in the app.",
-                    linesRead, resultList.size()));
+            if (resultList.size() < linesRead) {
+                b.setMessage(String.format(
+                        "Read %d lines and found %d entries to import. " +
+                                "This will DELETE any records already in the app.",
+                        linesRead, resultList.size()));
+            } else {
+                b.setMessage(String.format(
+                        "Found %d entries to import. " +
+                                "This will DELETE any records already in the app.",
+                        resultList.size()));
+            }
+
 
             b.setPositiveButton("Import", new OnClickListener() {
                 @Override
@@ -368,7 +373,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
                     getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
                     for (WeightEntry e : resultList) {
-                        storeEntry(e.weight+"", e.timestamp);
+                        storeEntry(e.weight + "", e.timestamp);
                     }
                 }
             });
@@ -380,36 +385,18 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             b.setNeutralButton("Show logs", new OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialogInterface, int i) {
-                    for(String errLine : logs.toString().split("\n")) {
+
+                    for (String errLine : logs.toString().split("\n")) {
                         Log.d("import", errLine);
                     }
+
+                    Intent intent = new Intent(MainActivity.this, ShowLogsActivity.class);
+                    intent.putExtra("logs", logs.toString());
+                    startActivity(intent);
                 }
             });
         }
         b.show();
-    }
-
-
-    private void importEntries(List<String[]> entries) {
-
-
-        // Add all the new records
-        int nInported = 0;
-        SimpleDateFormat dateFormat = new SimpleDateFormat(format, new Locale("de"));
-        for (String[] entry : entries) {
-            Log.d("Import", "Entry: " + Arrays.toString(entry));
-            try {
-                String weight = entry[1];
-                Long timestamp = dateFormat.parse(entry[0]).getTime() / 1000;
-                Log.d("Import", "weight: " + weight + " timestamp:" + timestamp);
-                storeEntry(weight, timestamp);
-                nInported++;
-            } catch (Exception e) {
-                Log.e("Import", "Error: couldn't parse " + Arrays.toString(entry) + " Error: " + e);
-            }
-        }
-
-        Toast.makeText(MainActivity.this, "Imported " + nInported + " entries!", Toast.LENGTH_LONG).show();
     }
 
     public static class MyAdapter extends CursorAdapter {
@@ -441,8 +428,7 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(timeMs);
 
-            Locale locale = new Locale("de");
-            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
+            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault());
             timestampLabel.setText(dateFormat.format(cal.getTime()));
         }
     }

@@ -53,6 +53,11 @@ public class AddWeightActivity extends AppCompatActivity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
     }
 
+    @Override
+    public void setTheme(int resid) {
+        super.setTheme(Utils.getDialogTheme(this));
+    }
+
     public boolean isWeightValueValid(String weight) {
         return weight.length() > 0 && isNumeric(weight);
     }

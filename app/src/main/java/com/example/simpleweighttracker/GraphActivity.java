@@ -1,5 +1,6 @@
 package com.example.simpleweighttracker;
 
+import androidx.annotation.ColorInt;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceManager;
@@ -9,6 +10,7 @@ import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.View;
 
 import com.github.mikephil.charting.charts.LineChart;
@@ -42,6 +44,7 @@ public class GraphActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Utils.setTheme(this);
         setContentView(R.layout.activity_graph);
 
 //        findViewById(R.id.clicky).setOnClickListener(new View.OnClickListener() {
@@ -56,6 +59,7 @@ public class GraphActivity extends AppCompatActivity {
         chart = findViewById(R.id.chart1);
         chart.setData(getLineDataSet());
 
+
         // X AXIS
         chart.getAxisRight().setEnabled(false);
         final XAxis xa = chart.getXAxis();
@@ -63,15 +67,17 @@ public class GraphActivity extends AppCompatActivity {
         xa.setGranularityEnabled(true);
         xa.setPosition(XAxis.XAxisPosition.BOTTOM);
         xa.setTextSize(10f);
+        xa.setTextColor(Utils.getTextColor(this));
         xa.setDrawGridLines(true);
         xa.setValueFormatter(new ValueFormatter() {
 
-            private final SimpleDateFormat mFormat = new SimpleDateFormat("M.d HH:mm", Locale.ENGLISH);
+//            private final SimpleDateFormat mFormat = new SimpleDateFormat("M.d HH:mm", Locale.ENGLISH);
 
-            Locale locale = Locale.getDefault();
-            //            Locale locale = new Locale("sl");
+            //            Locale locale = Locale.getDefault();
+//            Locale locale = new Locale("sl");
 //            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
-            DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.SHORT, locale);
+//            Locale locale = Utils.getDateLocale(GraphActivity.this);
+            DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault());
 
             @Override
             public String getFormattedValue(float x) {
@@ -82,11 +88,11 @@ public class GraphActivity extends AppCompatActivity {
         // Y AXIS
         final YAxis ya = chart.getAxisLeft();
         ya.setTextSize(10f);
+        ya.setTextColor(Utils.getTextColor(this));
         ya.setDrawGridLines(true);
 
 
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        final String weight_unit = prefs.getString("weight_unit", "default");
+        final String weight_unit = Utils.getDefaultWeightUnit(this);
         ya.setValueFormatter(new ValueFormatter() {
             @Override
             public String getFormattedValue(float value) {

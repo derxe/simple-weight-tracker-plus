@@ -26,4 +26,12 @@
     <string name="attachment_summary_on">Automatically download attachments for incoming emails
     </string>
     <string name="attachment_summary_off">Only download attachments when manually requested</string>
+
+    <string name="weight_units_title">Weight units</string>
+    <string name="weight_units_kg_title">Kilograms</string>
+    <string name="weight_units_pounds_title">Pounds</string>
+    <string name="theme_title">Theme</string>
+    <string name="light_theme_title">Light</string>
+    <string name="dark_theme_title">Dark</string>
+    <string name="black_theme_title">Black</string>
 </resources>
