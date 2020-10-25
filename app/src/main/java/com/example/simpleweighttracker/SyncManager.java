@@ -153,6 +153,22 @@ public class SyncManager {
         return newSyncKey;
     }
 
+    private SyncResultListener onResultsListeners;
+
+    interface SyncResultListener {
+        void onSyncResult(boolean success, String message);
+    }
+
+    public void setOnResultListener(SyncResultListener listener) {
+        this.onResultsListeners = listener;
+    }
+
+    private void onSyncResult(boolean success, String message) {
+        if(this.onResultsListeners != null) {
+            onResultsListeners.onSyncResult(success, message);
+        }
+    }
+
     public void sync() {
         String url = serverUrl + "/" + userKey + "/.json";
         Log.d(TAG, "Getting data from the server url: " + url);
@@ -170,6 +186,8 @@ public class SyncManager {
                     } catch (JSONException e) {
                         Log.e(TAG, "Unable to parse the response from server as JSON: Error: " + e.toString() + " data: " + responseStr);
                         e.printStackTrace();
+                        onSyncResult(false, "Server error");
+                        return;
                     }
 
                     String mySyncKey = getMySyncKey();
@@ -198,10 +216,13 @@ public class SyncManager {
                             askUserWhichDataToKeep(getOnlineData(response), mySyncKey, onlineSyncKey);
                         }
                     }
+
+                    onSyncResult(true, "Sync successful");
                 },
                 (Response.ErrorListener) error -> {
-                    Log.e("my app", "Failed getting sync data: " + error.toString());
+                    Log.e("my app", "Failed getting data from server: " + error.toString());
                     error.printStackTrace();
+                    onSyncResult(false, "Failed getting data from server");
                 }));
     }
 

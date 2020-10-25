@@ -159,7 +159,11 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case R.id.sync:
-                (new SyncManager(this)).sync();
+                SyncManager syncManager = new SyncManager(this);
+                syncManager.setOnResultListener((success, message) -> {
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                });
+                syncManager.sync();
                 break;
 
             default:
