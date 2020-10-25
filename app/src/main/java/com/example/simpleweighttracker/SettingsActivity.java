@@ -44,7 +44,7 @@ public class SettingsActivity extends AppCompatActivity {
             super.onCreate(savedInstanceState);
 
             prefs = PreferenceManager.getDefaultSharedPreferences(requireActivity());
-            ;
+
             startThemeKey = prefs.getString("theme", getString(R.string.default_theme_value));
 
             Preference themePreference = findPreference("theme");

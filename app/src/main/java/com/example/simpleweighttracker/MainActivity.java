@@ -2,90 +2,63 @@ package com.example.simpleweighttracker;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.DatePickerDialog;
-import android.app.Dialog;
-import android.app.TimePickerDialog;
-import android.content.ContentValues;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
+import android.os.Environment;
+import android.provider.DocumentsContract;
+import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.GravityCompat;
 import androidx.cursoradapter.widget.CursorAdapter;
 import androidx.loader.app.LoaderManager;
 import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
 import androidx.preference.PreferenceManager;
 
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Looper;
-import android.provider.DocumentsContract;
-import android.provider.MediaStore;
-import android.provider.Settings;
-import android.text.Editable;
-import android.text.InputType;
-import android.util.Log;
-import android.view.LayoutInflater;
-import android.view.View;
-
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.DatePicker;
-import android.widget.EditText;
-import android.widget.ListView;
-import android.widget.TextView;
-import android.widget.TimePicker;
-import android.widget.Toast;
-
-import net.rdrei.android.dirchooser.DirectoryChooserActivity;
-import net.rdrei.android.dirchooser.DirectoryChooserConfig;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.Date;
 import java.util.Locale;
-import java.util.Random;
 
-import static androidx.appcompat.app.AlertDialog.*;
+import static androidx.appcompat.app.AlertDialog.Builder;
+import static com.example.simpleweighttracker.WeightsValueProvider.storeWeight;
 
 
-public class MainActivity extends AppCompatActivity implements LoaderManager.LoaderCallbacks<Cursor> {
+public class MainActivity extends AppCompatActivity {
     public static final boolean DEBUG = !BuildConfig.BUILD_TYPE.equals("release");
     private static final String TAG = "MainActivity";
 
     private static final int STORAGE_PERMISSION_CODE = 123;
+    // request codes
+    public static int USER_SELECT_DIRECTORY_RC = 1;
+    public static int USER_SELECT_FILE_RC = 2;
     MyAdapter listAdapter;
 
     @Override
@@ -95,25 +68,43 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         setContentView(R.layout.activity_main);
         PreferenceManager.setDefaultValues(this, R.xml.root_preferences, false);
 
-        getSupportLoaderManager().initLoader(0, null, this);
+        loadData();
 
         Toolbar toolbar = findViewById(R.id.toolbar);
-//        toolbar.setPopupTheme(R.style.AppTheme);
         setSupportActionBar(toolbar);
 
         FloatingActionButton fab = findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(new Intent(MainActivity.this, AddWeightActivity.class));
-            }
+        fab.setOnClickListener(view -> {
+            startActivity(new Intent(MainActivity.this, AddWeightActivity.class));
         });
+    }
 
-
+    public void loadData() {
         ListView listView = findViewById(R.id.list);
-
         listAdapter = new MyAdapter(this, null);
         listView.setAdapter(listAdapter);
+
+        LoaderManager.getInstance(this).initLoader(0, null, new LoaderManager.LoaderCallbacks<Cursor>() {
+            @NonNull
+            @Override
+            public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
+                String[] projection = {"_id", "value", "timestamp"};
+
+                String selection = "value NOT LIKE ''";
+                return new CursorLoader(MainActivity.this,
+                        WeightsValueProvider.CONTENT_URI, projection, selection, null, null);
+            }
+
+            @Override
+            public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
+                listAdapter.changeCursor(cursor);
+            }
+
+            @Override
+            public void onLoaderReset(@NonNull Loader<Cursor> loader) {
+                listAdapter.changeCursor(null);
+            }
+        });
     }
 
     @Override
@@ -121,28 +112,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
         super.onResume();
         Utils.updateTheme(this);
     }
-
-
-    @NonNull
-    @Override
-    public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
-        String[] projection = {"_id", "value", "timestamp"};
-
-        CursorLoader cursorLoader = new CursorLoader(this,
-                WeightsValueProvider.CONTENT_URI, projection, null, null, null);
-        return cursorLoader;
-    }
-
-    @Override
-    public void onLoadFinished(@NonNull Loader<Cursor> loader, Cursor cursor) {
-        listAdapter.changeCursor(cursor);
-    }
-
-    @Override
-    public void onLoaderReset(@NonNull Loader<Cursor> loader) {
-        listAdapter.changeCursor(null);
-    }
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -155,13 +124,14 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     public boolean onOptionsItemSelected(MenuItem item) {
         Context context = MainActivity.this;
 
-        switch(item.getItemId()) {
+        switch (item.getItemId()) {
             case R.id.settings:
                 startActivity(new Intent(context, SettingsActivity.class));
                 break;
 
             case R.id.open_graph:
-                startActivity(new Intent(context, GraphActivity.class));
+                (new SyncManager(this)).sync();
+//                startActivity(new Intent(context, GraphActivity.class));
                 break;
 
             case R.id.export_csv:
@@ -180,10 +150,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
         return true;
     }
-
-    // request codes
-    public static int USER_SELECT_DIRECTORY_RC = 1;
-    public static int USER_SELECT_FILE_RC = 2;
 
     private void userSelectDirectory() {
         Uri downloadsUri = Uri.fromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS));
@@ -209,14 +175,13 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     }
 
     private void userSelectFile() {
-        Intent intent = null;
-        // get
+        Intent intent;
+        // depending on android versions there are different intents how to get user to select file
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
             intent = new Intent()
                     .setType("*/*")
                     .addCategory(Intent.CATEGORY_OPENABLE)
                     .setAction(Intent.ACTION_OPEN_DOCUMENT);
-
         } else {
             intent = new Intent()
                     .setType("*/*")
@@ -229,13 +194,13 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if(requestCode == USER_SELECT_FILE_RC && resultCode == RESULT_OK) {
+        if (requestCode == USER_SELECT_FILE_RC && resultCode == RESULT_OK) {
             Uri selectedFile = data.getData(); //The uri with the location of the file
             Toast.makeText(this, "Selected file: " + selectedFile, Toast.LENGTH_LONG).show();
             importCSV(selectedFile);
         }
 
-        if(requestCode == USER_SELECT_DIRECTORY_RC && resultCode == RESULT_OK) {
+        if (requestCode == USER_SELECT_DIRECTORY_RC && resultCode == RESULT_OK) {
             Uri selectedFile = data.getData(); //The uri with the location of the file
             Toast.makeText(this, "Selected file: " + selectedFile, Toast.LENGTH_LONG).show();
             exportCSV(selectedFile);
@@ -243,51 +208,28 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
     }
 
     public void exportCSV(Uri fileUri) {
+        Calendar cal = Calendar.getInstance();
+        Locale locale = Utils.getDateLocale(this);
+        String format = Utils.getDateFormat(this);
+        SimpleDateFormat sdf = new SimpleDateFormat(format, locale);
+
+        StringBuilder sb = new StringBuilder();
+        WeightsValueProvider.getAllWeights(this, (timestamp, weight) -> {
+            cal.setTimeInMillis(timestamp);
+            String timestampStr = sdf.format(cal.getTime());
+            sb.append(String.format("%s,%s\n", timestampStr, weight));
+        });
+
         try {
             FileOutputStream f = (FileOutputStream) getContentResolver().openOutputStream(fileUri);
             assert f != null;
 
-            Cursor cursor = getContentResolver().query(
-                    WeightsValueProvider.CONTENT_URI, new String[]{
-                            "value", "timestamp"
-                    }, null, null, "timestamp ASC");
-            assert cursor != null;
-
-            Calendar cal = Calendar.getInstance();
-            Locale locale = Utils.getDateLocale(this);
-            String format = Utils.getDateFormat(this);
-            SimpleDateFormat sdf = new SimpleDateFormat(format, locale);
-
-            int timestampIndex = cursor.getColumnIndex("timestamp");
-            int valueIndex = cursor.getColumnIndex("value");
-
-            while (cursor.moveToNext()) {
-                long time = cursor.getLong(timestampIndex) * 1000L;
-                cal.setTimeInMillis(time);
-                String timestamp = sdf.format(cal.getTime());
-                String value = cursor.getString(valueIndex);
-                String line = String.format("%s,%s\n", timestamp, value);
-
-                f.write(line.getBytes());
-            }
-
-            cursor.close();
+            f.write(sb.toString().getBytes());
             f.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-    private static class WeightEntry {
-        float weight;
-        long timestamp;
-
-        WeightEntry(float weight, long timestamp) {
-            this.weight = weight;
-            this.timestamp = timestamp;
-        }
-    }
-
 
     @SuppressLint("DefaultLocale")
     public void importCSV(Uri fileUri) {
@@ -321,8 +263,12 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
                     long timestamp;
                     try {
+                        Date parsedDate = dateFormat.parse(row[0]);
+                        if (parsedDate == null)
+                            throw new NullPointerException("Unable to parse date: " + row[0]);
+                        timestamp = parsedDate.getTime();
+
                         float weight = Float.parseFloat(row[1]);
-                        timestamp = dateFormat.parse(row[0]).getTime() / 1000;
                         resultList.add(new WeightEntry(weight, timestamp));
                         logs.append(String.format("Line %d success. weight:'%.2f' timestamp:'%d'\n", linesRead, weight, timestamp));
                     } catch (Exception e) {
@@ -342,11 +288,8 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
 
         Builder b = new Builder(this);
         b.setTitle("Import records");
-        b.setNegativeButton("Cancel", new OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialogInterface, int i) {
+        b.setNegativeButton("Cancel", (dialogInterface, i) -> {
 
-            }
         });
 
         if (resultList.size() <= 0) {
@@ -366,37 +309,79 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             }
 
 
-            b.setPositiveButton("Import", new OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
-                    // Delete all records in app
-                    getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
+            b.setPositiveButton("Import", (dialogInterface, which) -> {
+                // Delete all records in app
+                getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
-                    for (WeightEntry e : resultList) {
-                        storeEntry(e.weight + "", e.timestamp);
-                    }
+                for (WeightEntry e : resultList) {
+                    storeWeight(MainActivity.this, e.weight + "", e.timestamp);
                 }
             });
         }
 
-        if(resultList.size() < linesRead) {
+        if (resultList.size() < linesRead) {
             // there have been some lines that parser was unable to read
             // give a user an option to show those errors.
-            b.setNeutralButton("Show logs", new OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialogInterface, int i) {
+            b.setNeutralButton("Show logs", (dialogInterface, which) -> {
 
-                    for (String errLine : logs.toString().split("\n")) {
-                        Log.d("import", errLine);
-                    }
-
-                    Intent intent = new Intent(MainActivity.this, ShowLogsActivity.class);
-                    intent.putExtra("logs", logs.toString());
-                    startActivity(intent);
+                for (String errLine : logs.toString().split("\n")) {
+                    Log.d("import", errLine);
                 }
+
+                Intent intent = new Intent(MainActivity.this, ShowLogsActivity.class);
+                intent.putExtra("logs", logs.toString());
+                startActivity(intent);
             });
         }
         b.show();
+    }
+
+    public boolean hasWritePermission() {
+        return hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, STORAGE_PERMISSION_CODE);
+    }
+
+    // Function to check and request permission
+    public boolean hasPermission(String permission, int requestCode) {
+        // Checking if permission is not granted
+        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_DENIED) {
+            ActivityCompat.requestPermissions(
+                    this, new String[]{permission}, requestCode);
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == STORAGE_PERMISSION_CODE) {
+            if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(MainActivity.this,
+                        "Storage Permission Granted",
+                        Toast.LENGTH_SHORT)
+                        .show();
+            } else {
+                Toast.makeText(MainActivity.this,
+                        "Storage Permission Denied",
+                        Toast.LENGTH_SHORT)
+                        .show();
+            }
+        }
+    }
+
+    private static class WeightEntry {
+        float weight;
+        long timestamp;
+
+        WeightEntry(float weight, long timestamp) {
+            this.weight = weight;
+            this.timestamp = timestamp;
+        }
     }
 
     public static class MyAdapter extends CursorAdapter {
@@ -412,7 +397,6 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             return mInflater.inflate(R.layout.list_row, parent, false);
         }
 
-
         @Override
         public void bindView(View view, Context context, Cursor cursor) {
             // get the fields from the row
@@ -424,61 +408,12 @@ public class MainActivity extends AppCompatActivity implements LoaderManager.Loa
             weightLabel.setText(value);
 
             // set the timestamp label
-            long timeMs = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000L;
+            long timeMs = cursor.getLong(cursor.getColumnIndex("timestamp"));
             Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(timeMs);
 
             DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault());
             timestampLabel.setText(dateFormat.format(cal.getTime()));
-        }
-    }
-
-    private void storeEntry(String value, Long timestamp) {
-        ContentValues values = new ContentValues();
-        values.put(WeightsValueProvider.VALUE, value);
-        values.put(WeightsValueProvider.TIMESTAMP, timestamp);
-        getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
-    }
-
-    public boolean hasWritePermission() {
-        return hasPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, STORAGE_PERMISSION_CODE);
-    }
-
-    // Function to check and request permission
-    public boolean hasPermission(String permission, int requestCode)
-    {
-        // Checking if permission is not granted
-        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_DENIED) {
-            ActivityCompat.requestPermissions(
-                            this, new String[] { permission }, requestCode);
-            return false;
-        }
-        else {
-            return true;
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions,
-                                           @NonNull int[] grantResults)
-    {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == STORAGE_PERMISSION_CODE) {
-            if (grantResults.length > 0
-                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(MainActivity.this,
-                        "Storage Permission Granted",
-                        Toast.LENGTH_SHORT)
-                        .show();
-            }
-            else {
-                Toast.makeText(MainActivity.this,
-                        "Storage Permission Denied",
-                        Toast.LENGTH_SHORT)
-                        .show();
-            }
         }
     }
 

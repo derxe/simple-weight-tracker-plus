@@ -16,7 +16,12 @@ import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
 
+import java.io.IOException;
+import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Locale;
 
 public class WeightsValueProvider extends ContentProvider {
     // fields for my content provider
@@ -53,6 +58,8 @@ public class WeightsValueProvider extends ContentProvider {
     static final int DATABASE_VERSION = 1;
 
 
+
+
     // class that creates and manages the provider's database
     private static class DBHelper extends SQLiteOpenHelper {
 
@@ -78,6 +85,48 @@ public class WeightsValueProvider extends ContentProvider {
             onCreate(db);
         }
 
+    }
+
+    public static void storeWeight(Context context, String value, Long timestamp) {
+        ContentValues values = new ContentValues();
+        values.put(WeightsValueProvider.VALUE, value);
+        values.put(WeightsValueProvider.TIMESTAMP, timestamp);
+        context.getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
+    }
+
+    public static void updateWeight(Context context, String value, String timestamp) {
+        ContentValues values = new ContentValues();
+        values.put(WeightsValueProvider.VALUE, value);
+        context.getContentResolver().update(
+                WeightsValueProvider.CONTENT_URI,
+                values,
+                "timestamp = ?",
+                new String[]{timestamp});
+    }
+
+
+    public interface GetAllWeightsIterator {
+        void weight(long timestamp, String weight);
+    }
+
+    public static void getAllWeights(Context context, GetAllWeightsIterator responseFun) {
+        Cursor cursor = context.getContentResolver().query(
+                WeightsValueProvider.CONTENT_URI, new String[]{
+                        "value", "timestamp"
+                }, null, null, "timestamp ASC");
+        assert cursor != null;
+
+        int timestampIndex = cursor.getColumnIndex("timestamp");
+        int weightIndex = cursor.getColumnIndex("value");
+
+        while (cursor.moveToNext()) {
+            long time = cursor.getLong(timestampIndex);
+            String weight = cursor.getString(weightIndex);
+
+            responseFun.weight(time, weight);
+        }
+
+        cursor.close();
     }
 
     @Override

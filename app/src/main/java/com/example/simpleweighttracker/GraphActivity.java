@@ -1,45 +1,29 @@
 package com.example.simpleweighttracker;
 
-import androidx.annotation.ColorInt;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.preference.PreferenceFragmentCompat;
-import androidx.preference.PreferenceManager;
-
-import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.View;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.ValueFormatter;
-import com.github.mikephil.charting.utils.ColorTemplate;
 
 import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 public class GraphActivity extends AppCompatActivity {
 
-    private LineChart chart;
 
-
-    // Unix Timestamp for 2022-1-1:
-    // seconds: 1640995200
-    private static long shift = 1640995200;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,7 +40,7 @@ public class GraphActivity extends AppCompatActivity {
 //            }
 //        });
 
-        chart = findViewById(R.id.chart1);
+        LineChart chart = findViewById(R.id.chart1);
         chart.setData(getLineDataSet());
 
 
@@ -81,7 +65,7 @@ public class GraphActivity extends AppCompatActivity {
 
             @Override
             public String getFormattedValue(float x) {
-                return dateFormat.format(new Date(xToSeconds(x) * 1000));
+                return dateFormat.format(new Date(xToMillis(x)));
             }
         });
 
@@ -118,48 +102,41 @@ public class GraphActivity extends AppCompatActivity {
         chart.setScaleYEnabled(false);
     }
 
-    private float secondsToX(long seconds) {
-        return seconds - shift;
+    // Unix Timestamp for 2022-1-1:
+    // seconds: 1640995200
+    private static long shift = 1640995200;
+
+    // we need to shift the timestamp so that values can be more accurately represented in float format
+    // the basic idea is that we want to make number as small as possible in order to be still
+    // accurately represented by float. We could also convert seconds to minutes in order to get
+    // a smaller number. But calculating the error the seconds work good enough.
+    //
+    // The best method would be to calculate shift so that min timestamp and max timestamp are on
+    // the opposite site of number line -> their center is on 0
+    private float millisToX(long milliseconds) {
+        return TimeUnit.MILLISECONDS.toSeconds(milliseconds) - shift;
     }
 
-    private long xToSeconds(float x) {
-        return ((long) x) + shift;
+    private long xToMillis(float x) {
+        return TimeUnit.SECONDS.toMillis((long) x) + shift;
     }
 
 
     private LineData getLineDataSet() {
+
         ArrayList<Entry> values = new ArrayList<>();
-        Cursor cursor = getContentResolver().query(
-                WeightsValueProvider.CONTENT_URI, new String[]{
-                        "value", "timestamp"
-                }, null, null, "timestamp");
-        assert cursor != null;
-
-        final int valueIndex = cursor.getColumnIndex("value");
-        final int timestampIndex = cursor.getColumnIndex("timestamp");
-
         long errorSum = 0;
-        for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
-            float y = cursor.getFloat(valueIndex);
-            long seconds = cursor.getLong(timestampIndex);
-            float x = secondsToX(seconds);
+        WeightsValueProvider.getAllWeights(this, (timestamp, weight) -> {
+            float y = Float.parseFloat(weight);
+            float x = millisToX(timestamp);
+            long error = Math.abs(timestamp - xToMillis(millisToX(timestamp)));
 
-            long error = Math.abs(seconds - xToSeconds(secondsToX(seconds)));
-            errorSum += error;
-
-            Log.d("Graph", "x:" + x + ", y:" + y + " " + seconds + " " + xToSeconds(secondsToX(seconds)) + " " + error);
+            Log.d("Graph", "x:" + x + ", y:" + y + " " + timestamp + " " + error);
             values.add(new Entry(x, y)); // add one entry per hour
-        }
-
+        });
         Log.d("Graph", "Error sum " + errorSum);
 
-
-        Collections.sort(values, new Comparator<Entry>() {
-            @Override
-            public int compare(Entry e1, Entry e2) {
-                return (int) (e1.getX() - e2.getX());
-            }
-        });
+        Collections.sort(values, (e1, e2) -> (int) (e1.getX() - e2.getX()));
 
         LineDataSet lds = new LineDataSet(values, "data");
         lds.setCircleColor(Color.parseColor("#35b721"));
@@ -176,63 +153,5 @@ public class GraphActivity extends AppCompatActivity {
         LineData ld = new LineData(lds);
         ld.setDrawValues(false);
         return ld;
-    }
-
-
-    private void setData() {
-        ArrayList<Entry> values = new ArrayList<>();
-        Cursor cursor = getContentResolver().query(
-                WeightsValueProvider.CONTENT_URI, new String[]{
-                        "value", "timestamp"
-                }, null, null, "timestamp");
-        assert cursor != null;
-
-        float x;
-        for (cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
-            float y = cursor.getFloat(cursor.getColumnIndex("value"));
-            long time = cursor.getLong(cursor.getColumnIndex("timestamp")) * 1000;
-            Log.d("Graph", "Time: " + time);
-            x = (float) TimeUnit.MILLISECONDS.toHours(time);
-            Log.d("Graph", "x:" + x + ", y:" + y);
-            values.add(new Entry(x, y)); // add one entry per hour
-        }
-
-        ArrayList<Entry> values2 = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
-            values2.add(new Entry(i, (float) Math.sin(((float) i) / 3)));
-        }
-
-        Collections.sort(values, new Comparator<Entry>() {
-            @Override
-            public int compare(Entry e1, Entry e2) {
-                return (int) (e2.getX() - e1.getX());
-            }
-        });
-
-        for (Entry e : values) {
-            Log.d("Graph", "values: x:" + e.getX() + ", y:" + e.getY());
-        }
-
-
-        // create a dataset and give it a type
-        LineDataSet set1 = new LineDataSet(values2, "DataSet 1");
-        set1.setAxisDependency(YAxis.AxisDependency.LEFT);
-        set1.setColor(ColorTemplate.getHoloBlue());
-        set1.setValueTextColor(ColorTemplate.getHoloBlue());
-        set1.setLineWidth(1.5f);
-        set1.setDrawCircles(false);
-        set1.setDrawValues(true);
-        set1.setFillAlpha(65);
-        set1.setFillColor(ColorTemplate.getHoloBlue());
-        set1.setHighLightColor(Color.rgb(244, 117, 117));
-        set1.setDrawCircleHole(false);
-
-        // create a data object with the data sets
-        LineData data = new LineData(set1);
-        data.setValueTextColor(Color.WHITE);
-        data.setValueTextSize(9f);
-
-        // set data
-        chart.setData(data);
     }
 }

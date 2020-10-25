@@ -1,18 +1,11 @@
 package com.example.simpleweighttracker;
 
-import androidx.appcompat.app.AppCompatActivity;
-
-import android.app.Activity;
-import android.content.ContentValues;
-import android.content.Context;
 import android.os.Bundle;
-import android.view.KeyEvent;
-import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
-import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
 
 public class AddWeightActivity extends AppCompatActivity {
 
@@ -24,23 +17,15 @@ public class AddWeightActivity extends AppCompatActivity {
         setContentView(R.layout.activity_add_weight);
 
         weightInput = findViewById(R.id.weight);
-        findViewById(R.id.addWeight).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
+        findViewById(R.id.addWeight).setOnClickListener(view -> addWeightAndFinish());
+
+        weightInput.setOnEditorActionListener((textView, actionId, keyEvent) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
                 addWeightAndFinish();
             }
-        });
 
-        weightInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView textView, int actionId, KeyEvent keyEvent) {
-                if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    addWeightAndFinish();
-                }
-
-                // true -> we consumed the click
-                return true;
-            }
+            // true -> we consumed the click
+            return true;
         });
 
         /*
@@ -74,20 +59,12 @@ public class AddWeightActivity extends AppCompatActivity {
     private void addWeightAndFinish() {
         String weight = weightInput.getText().toString();
         if (isWeightValueValid(weight)) {
-            long timestamp = System.currentTimeMillis() / 1000L;
+            long timestamp = System.currentTimeMillis();
 
-            storeEntry(weight, timestamp);
+            WeightsValueProvider.storeWeight(this, weight, timestamp);
             AddWeightActivity.this.finish();
         } else {
             weightInput.setError("Incorrect weight");
         }
-    }
-
-    private void storeEntry(String value, Long timestamp) {
-        ContentValues values = new ContentValues();
-        values.put(WeightsValueProvider.VALUE, value);
-        values.put(WeightsValueProvider.TIMESTAMP, timestamp);
-
-        getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
     }
 }

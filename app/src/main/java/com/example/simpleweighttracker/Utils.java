@@ -108,7 +108,6 @@ public class Utils {
         }
 
         return theme;
-//        context.setTheme(theme);
     }
 
 }
