@@ -17,6 +17,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -33,6 +34,7 @@ import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
 import androidx.preference.PreferenceManager;
 
+import com.example.simpleweighttracker.WeightsValueProvider.Weight;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.BufferedReader;
@@ -60,7 +62,9 @@ public class MainActivity extends AppCompatActivity {
     public static int USER_SELECT_DIRECTORY_RC = 1;
     public static int USER_SELECT_FILE_RC = 2;
     MyAdapter listAdapter;
+    ListView listView;
 
+    // (new SyncManager(this)).sync();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,7 +72,19 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         PreferenceManager.setDefaultValues(this, R.xml.root_preferences, false);
 
+        listView = findViewById(R.id.list);
         loadData();
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Weight weight = WeightsValueProvider.getWeightById(MainActivity.this, id);
+                Bundle bundle = new Bundle();
+                bundle.putSerializable("weight", weight);
+                Intent intent = new Intent(getApplicationContext(), AddWeightActivity.class);
+                intent.putExtras(bundle);
+                startActivity(intent);
+            }
+        });
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
@@ -80,7 +96,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void loadData() {
-        ListView listView = findViewById(R.id.list);
         listAdapter = new MyAdapter(this, null);
         listView.setAdapter(listAdapter);
 
@@ -90,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
             public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
                 String[] projection = {"_id", "value", "timestamp"};
 
-                String selection = "value NOT LIKE ''";
+                String selection = "value != ''";
                 return new CursorLoader(MainActivity.this,
                         WeightsValueProvider.CONTENT_URI, projection, selection, null, null);
             }
@@ -130,8 +145,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case R.id.open_graph:
-                (new SyncManager(this)).sync();
-//                startActivity(new Intent(context, GraphActivity.class));
+                startActivity(new Intent(context, GraphActivity.class));
                 break;
 
             case R.id.export_csv:
@@ -142,6 +156,10 @@ public class MainActivity extends AppCompatActivity {
             case R.id.import_csv:
                 if (hasWritePermission())
                     userSelectFile();
+                break;
+
+            case R.id.sync:
+                (new SyncManager(this)).sync();
                 break;
 
             default:

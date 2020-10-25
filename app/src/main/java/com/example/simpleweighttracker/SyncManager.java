@@ -24,7 +24,7 @@ public class SyncManager {
     private static final String TAG = "SyncManager";
     Context context;
     String serverUrl = "https://angular-tst.firebaseio.com/weightTracker";
-    String userKey = "test1";
+    String userKey = "dejanski";
 
     public SyncManager(Context context) {
         this.context = context;
@@ -108,10 +108,10 @@ public class SyncManager {
 
         Iterator<String> keys = data.keys();
         while (keys.hasNext()) {
-            String timestamp = keys.next();
             try {
+                String timestamp = keys.next();
                 String weight = (String) data.get(timestamp);
-                WeightsValueProvider.updateWeight(context, weight, timestamp);
+                WeightsValueProvider.updateWeight(context, weight,  Long.getLong(timestamp));
             } catch (JSONException e) {
                 e.printStackTrace();
             }
@@ -173,7 +173,6 @@ public class SyncManager {
                     }
 
                     String mySyncKey = getMySyncKey();
-                    mySyncKey = "asdasd";
 
                     if (onlineSyncKey == null) {
                         // no data yet on the server.
@@ -207,7 +206,7 @@ public class SyncManager {
     }
 
     /**
-     * When data on the server has diffent sync key compared to the data here.
+     * When data on the server has different sync key compared to the data here.
      * User needs to decide which data to keep
      */
     public void askUserWhichDataToKeep(JSONObject serverData, String mySyncKey, String onlineSyncKey) {
@@ -215,7 +214,7 @@ public class SyncManager {
         b.setTitle("Error syncing data ");
         b.setMessage("Data from the server is different from your local data.");
 
-        b.setPositiveButton("Cancel", (dialogInterface, i) -> {});
+        b.setCancelable(true); //"Cancel", (dialogInterface, i) -> {});
 
         b.setNeutralButton("Overwrite online data", (dialogInterface, i) -> {
             // user decided to keep local data

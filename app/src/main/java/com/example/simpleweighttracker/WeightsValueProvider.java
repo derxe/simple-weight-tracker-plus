@@ -15,8 +15,10 @@ import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
+import android.widget.AdapterView;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -87,6 +89,37 @@ public class WeightsValueProvider extends ContentProvider {
 
     }
 
+    public static class Weight implements Serializable {
+        long id;
+        String weight;
+        long timestamp;
+    }
+
+    public static Weight getWeightById(Context context, long id) {
+        Cursor cursor = context.getContentResolver().query(
+                WeightsValueProvider.CONTENT_URI,
+                new String[]{ID, VALUE, TIMESTAMP},
+                ID + "= ?",
+               new String[]{String.valueOf(id)},
+                "timestamp ASC");
+        if(cursor == null) return null;
+
+        int idIndex = cursor.getColumnIndex(ID);
+        int timestampIndex = cursor.getColumnIndex(TIMESTAMP);
+        int weightIndex = cursor.getColumnIndex(VALUE);
+
+        Weight weight = null;
+        while (cursor.moveToNext()) {
+            weight = new Weight();
+            weight.id = cursor.getLong(idIndex);
+            weight.timestamp = cursor.getLong(timestampIndex);
+            weight.weight = cursor.getString(weightIndex);
+        }
+        cursor.close();
+
+        return weight;
+    }
+
     public static void storeWeight(Context context, String value, Long timestamp) {
         ContentValues values = new ContentValues();
         values.put(WeightsValueProvider.VALUE, value);
@@ -94,16 +127,30 @@ public class WeightsValueProvider extends ContentProvider {
         context.getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
     }
 
-    public static void updateWeight(Context context, String value, String timestamp) {
+    public static void deleteWeightWithId(Context context, long id) {
+        updateWeightWithId(context, id, "", null);
+    }
+
+    public static void updateWeightWithId(Context context, long id, String weight, Long timestamp) {
+        ContentValues values = new ContentValues();
+        if(weight != null) values.put(VALUE, weight);
+        if(timestamp != null) values.put(TIMESTAMP, timestamp);
+        context.getContentResolver().update(
+                WeightsValueProvider.CONTENT_URI,
+                values,
+                ID + " = ?",
+                new String[]{String.valueOf(id)});
+    }
+
+    public static void updateWeight(Context context, String value, Long timestamp) {
         ContentValues values = new ContentValues();
         values.put(WeightsValueProvider.VALUE, value);
         context.getContentResolver().update(
                 WeightsValueProvider.CONTENT_URI,
                 values,
                 "timestamp = ?",
-                new String[]{timestamp});
+                new String[]{String.valueOf(timestamp)});
     }
-
 
     public interface GetAllWeightsIterator {
         void weight(long timestamp, String weight);
@@ -113,7 +160,7 @@ public class WeightsValueProvider extends ContentProvider {
         Cursor cursor = context.getContentResolver().query(
                 WeightsValueProvider.CONTENT_URI, new String[]{
                         "value", "timestamp"
-                }, null, null, "timestamp ASC");
+                }, VALUE + " != ''", null, "timestamp ASC");
         assert cursor != null;
 
         int timestampIndex = cursor.getColumnIndex("timestamp");
