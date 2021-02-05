@@ -50,7 +50,7 @@ import java.util.Date;
 import java.util.Locale;
 
 import static androidx.appcompat.app.AlertDialog.Builder;
-import static com.example.simpleweighttracker.WeightsValueProvider.storeWeight;
+import static com.example.simpleweighttracker.WeightsValueProvider.insertWeight;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     MyAdapter listAdapter;
     ListView listView;
 
-    // (new SyncManager(this)).sync();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -336,7 +336,7 @@ public class MainActivity extends AppCompatActivity {
                 getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
                 for (WeightEntry e : resultList) {
-                    storeWeight(MainActivity.this, e.weight + "", e.timestamp);
+                    insertWeight(MainActivity.this, e.weight + "", e.timestamp);
                 }
             });
         }

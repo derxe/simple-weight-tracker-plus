@@ -1,15 +1,32 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout   xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="@dimen/widget_margin"
-    android:background="#55000000">
+    android:orientation="vertical">
 
     <ImageView
-        android:id="@+id/imageView"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
+        android:id="@+id/appwidget_button"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:layout_gravity="center_horizontal"
         android:layout_weight="1"
-        android:src="@android:drawable/ic_menu_add"/>
+        android:layout_margin="0dp"
+        android:src="@drawable/weight_add"/>
+
+    <TextView
+        android:id="@+id/appwidget_text"
+        android:typeface="sans"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:textColor="@android:color/white"
+        android:text="Add weight"
+        android:textSize="12sp"
+        android:singleLine="true"
+        android:shadowColor="#000"
+        android:shadowDx="0"
+        android:shadowDy="0"
+        android:shadowRadius="4"/>
 
 </LinearLayout>
+

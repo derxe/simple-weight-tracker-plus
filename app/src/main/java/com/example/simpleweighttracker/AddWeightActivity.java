@@ -3,11 +3,13 @@ package com.example.simpleweighttracker;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -20,6 +22,8 @@ import static com.example.simpleweighttracker.WeightsValueProvider.*;
 
 public class AddWeightActivity extends AppCompatActivity {
 
+    public static final String DEBUG_TAB = "AddWeightActivity";
+    TextView title;
     EditText weightInput;
     Button changeDateBtn;
     Button changeTimeBtn;
@@ -33,8 +37,10 @@ public class AddWeightActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(DEBUG_TAB, "On create");
         setContentView(R.layout.activity_add_weight);
 
+        title = findViewById(R.id.addWeight_title);
         weightInput = findViewById(R.id.weight);
         changeDateBtn = findViewById(R.id.addWeight_date);
         changeTimeBtn = findViewById(R.id.addWeight_time);
@@ -51,6 +57,7 @@ public class AddWeightActivity extends AppCompatActivity {
         }
 
         if(updateWeight) {
+            title.setText("Update weight:");
             updateWeightBtn.setVisibility(View.VISIBLE);
             deleteWeightBtn.setVisibility(View.VISIBLE);
             cancelBtn.setVisibility(View.GONE);
@@ -62,6 +69,7 @@ public class AddWeightActivity extends AppCompatActivity {
             updateWeightBtn.setOnClickListener(view -> updateWeightAndFinish());
             deleteWeightBtn.setOnClickListener(view -> deleteWeightAndFinish());
         } else {
+            title.setText("Add new weight:");
             updateWeightBtn.setVisibility(View.GONE);
             deleteWeightBtn.setVisibility(View.GONE);
             cancelBtn.setVisibility(View.VISIBLE);
@@ -93,6 +101,11 @@ public class AddWeightActivity extends AppCompatActivity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        finish();
+    }
 
 
     private void updateDateTimeButtons() {
@@ -177,7 +190,7 @@ public class AddWeightActivity extends AppCompatActivity {
         if (validateWeightField()) {
             long timestamp = cal.getTimeInMillis();
 
-            storeWeight(this, weight, timestamp);
+            insertWeight(this, weight, timestamp);
             finish();
         }
     }

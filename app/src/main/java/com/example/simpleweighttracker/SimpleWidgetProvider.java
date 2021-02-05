@@ -12,7 +12,6 @@ public class SimpleWidgetProvider extends AppWidgetProvider {
 
     private static final String SYNC_CLICKED    = "automaticWidgetSyncButtonClick";
 
-
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         RemoteViews remoteViews;
@@ -21,7 +20,7 @@ public class SimpleWidgetProvider extends AppWidgetProvider {
         remoteViews = new RemoteViews(context.getPackageName(), R.layout.widget);
         watchWidget = new ComponentName(context, SimpleWidgetProvider.class);
 
-        remoteViews.setOnClickPendingIntent(R.id.imageView, getPendingSelfIntent(context, SYNC_CLICKED));
+        remoteViews.setOnClickPendingIntent(R.id.appwidget_button, getPendingSelfIntent(context, SYNC_CLICKED));
         appWidgetManager.updateAppWidget(watchWidget, remoteViews);
     }
 

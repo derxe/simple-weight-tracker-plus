@@ -95,6 +95,22 @@ public class WeightsValueProvider extends ContentProvider {
         long timestamp;
     }
 
+    private static Weight getWeightFromCursor(Cursor cursor) {
+        int idIndex = cursor.getColumnIndex(ID);
+        int timestampIndex = cursor.getColumnIndex(TIMESTAMP);
+        int weightIndex = cursor.getColumnIndex(VALUE);
+
+        Weight weight = null;
+        if (cursor.moveToNext()) {
+            weight = new Weight();
+            weight.id = cursor.getLong(idIndex);
+            weight.timestamp = cursor.getLong(timestampIndex);
+            weight.weight = cursor.getString(weightIndex);
+        }
+
+        return weight;
+    }
+
     public static Weight getWeightById(Context context, long id) {
         Cursor cursor = context.getContentResolver().query(
                 WeightsValueProvider.CONTENT_URI,
@@ -104,23 +120,26 @@ public class WeightsValueProvider extends ContentProvider {
                 "timestamp ASC");
         if(cursor == null) return null;
 
-        int idIndex = cursor.getColumnIndex(ID);
-        int timestampIndex = cursor.getColumnIndex(TIMESTAMP);
-        int weightIndex = cursor.getColumnIndex(VALUE);
-
-        Weight weight = null;
-        while (cursor.moveToNext()) {
-            weight = new Weight();
-            weight.id = cursor.getLong(idIndex);
-            weight.timestamp = cursor.getLong(timestampIndex);
-            weight.weight = cursor.getString(weightIndex);
-        }
+        Weight weight = getWeightFromCursor(cursor);
         cursor.close();
-
         return weight;
     }
 
-    public static void storeWeight(Context context, String value, Long timestamp) {
+    public static Weight getWeightByTimestamp(Context context, long timestamp) {
+        Cursor cursor = context.getContentResolver().query(
+                WeightsValueProvider.CONTENT_URI,
+                new String[]{ID, VALUE, TIMESTAMP},
+                TIMESTAMP + "= ?",
+                new String[]{String.valueOf(timestamp)},
+                null);
+        if(cursor == null) return null;
+
+        Weight weight = getWeightFromCursor(cursor);
+        cursor.close();
+        return weight;
+    }
+
+    public static void insertWeight(Context context, String value, Long timestamp) {
         ContentValues values = new ContentValues();
         values.put(WeightsValueProvider.VALUE, value);
         values.put(WeightsValueProvider.TIMESTAMP, timestamp);
@@ -152,15 +171,29 @@ public class WeightsValueProvider extends ContentProvider {
                 new String[]{String.valueOf(timestamp)});
     }
 
+    public static void updateOrInsertWeight(Context context, String value, Long timestamp) {
+        Weight weight = getWeightByTimestamp(context, timestamp);
+        if(weight == null) {
+            insertWeight(context, value, timestamp);
+        } else {
+            updateWeight(context, value, timestamp);
+        }
+    }
+
     public interface GetAllWeightsIterator {
         void weight(long timestamp, String weight);
     }
 
     public static void getAllWeights(Context context, GetAllWeightsIterator responseFun) {
+        getAllWeights(context,  false, responseFun);
+    }
+
+    public static void getAllWeights(Context context, boolean includeDeleted, GetAllWeightsIterator responseFun) {
+        String selection = includeDeleted? "" : VALUE + " != ''";
         Cursor cursor = context.getContentResolver().query(
                 WeightsValueProvider.CONTENT_URI, new String[]{
                         "value", "timestamp"
-                }, VALUE + " != ''", null, "timestamp ASC");
+                }, selection, null, "timestamp ASC");
         assert cursor != null;
 
         int timestampIndex = cursor.getColumnIndex("timestamp");
