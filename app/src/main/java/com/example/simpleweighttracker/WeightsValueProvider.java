@@ -59,9 +59,6 @@ public class WeightsValueProvider extends ContentProvider {
     static final String TABLE_NAME = "tracker";
     static final int DATABASE_VERSION = 1;
 
-
-
-
     // class that creates and manages the provider's database
     private static class DBHelper extends SQLiteOpenHelper {
 

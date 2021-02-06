@@ -105,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
             public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
                 String[] projection = {"_id", "value", "timestamp"};
 
-                String selection = "value != ''";
+                String selection = "value != ''"; // don't show deleted values
                 return new CursorLoader(MainActivity.this,
                         WeightsValueProvider.CONTENT_URI, projection, selection, null, null);
             }
@@ -433,7 +433,6 @@ public class MainActivity extends AppCompatActivity {
             long timeMs = cursor.getLong(cursor.getColumnIndex("timestamp"));
             Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(timeMs);
-
             DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault());
             timestampLabel.setText(dateFormat.format(cal.getTime()));
         }

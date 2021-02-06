@@ -1,5 +1,6 @@
 package com.example.simpleweighttracker;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -13,6 +14,7 @@ import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.text.DateFormat;
 import java.util.ArrayList;
@@ -23,7 +25,8 @@ import java.util.concurrent.TimeUnit;
 
 public class GraphActivity extends AppCompatActivity {
 
-
+    private static final String TAG = "GraphActivity";
+    LineChart chart;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,18 +34,23 @@ public class GraphActivity extends AppCompatActivity {
         Utils.setTheme(this);
         setContentView(R.layout.activity_graph);
 
-//        findViewById(R.id.clicky).setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                double move = Math.random();
-//                Log.d("Graph", "Ranges: " + chart.getXChartMax() + " " + chart.getHighestVisibleX());
-////                chart.moveViewToX((float) chart.getXChartMax() - chart.);
-//            }
-//        });
+        initChart();
 
-        LineChart chart = findViewById(R.id.chart1);
+        FloatingActionButton fab = findViewById(R.id.fab);
+        fab.setOnClickListener(view -> {
+            startActivity(new Intent(GraphActivity.this, AddWeightActivity.class));
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
         chart.setData(getLineDataSet());
+    }
 
+    private void initChart() {
+        chart = findViewById(R.id.chart1);
+        chart.setData(getLineDataSet());
 
         // X AXIS
         chart.getAxisRight().setEnabled(false);
@@ -55,16 +63,23 @@ public class GraphActivity extends AppCompatActivity {
         xa.setDrawGridLines(true);
         xa.setValueFormatter(new ValueFormatter() {
 
-//            private final SimpleDateFormat mFormat = new SimpleDateFormat("M.d HH:mm", Locale.ENGLISH);
-
-            //            Locale locale = Locale.getDefault();
-//            Locale locale = new Locale("sl");
-//            DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
-//            Locale locale = Utils.getDateLocale(GraphActivity.this);
+            //          private final SimpleDateFormat mFormat = new SimpleDateFormat("M.d HH:mm", Locale.ENGLISH);
+//          Locale locale = Locale.getDefault();
+//          Locale locale = new Locale("sl");
+//          DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale);
+//          Locale locale = Utils.getDateLocale(GraphActivity.this);
             DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault());
 
             @Override
             public String getFormattedValue(float x) {
+                /*
+                long visibleDuration = (long) (chart.getXRange() / chart.getScaleX());
+                long hours = TimeUnit.SECONDS.toHours(visibleDuration);
+                long days = TimeUnit.SECONDS.toDays(visibleDuration);
+                long months = days/30;
+                long years = days/365;
+                Log.d(TAG, hours + " "+ days + " "+ months + " "+ years + " " + chart.getScaleX() + " " + (long) chart.getXRange());
+                */
                 return dateFormat.format(new Date(xToMillis(x)));
             }
         });
@@ -74,7 +89,6 @@ public class GraphActivity extends AppCompatActivity {
         ya.setTextSize(10f);
         ya.setTextColor(Utils.getTextColor(this));
         ya.setDrawGridLines(true);
-
 
         final String weight_unit = Utils.getDefaultWeightUnit(this);
         ya.setValueFormatter(new ValueFormatter() {
@@ -86,7 +100,6 @@ public class GraphActivity extends AppCompatActivity {
 
         // CHART SETTINGS
         // scale so that last 5 days are visible
-
         float scaleX = Math.max(1, chart.getXRange() / TimeUnit.DAYS.toSeconds(6));
         chart.zoom(scaleX, 1, 0, 0);
         chart.moveViewToX(chart.getXChartMax()); // move chart far right
@@ -102,6 +115,7 @@ public class GraphActivity extends AppCompatActivity {
         chart.setScaleYEnabled(false);
     }
 
+
     // Unix Timestamp for 2022-1-1:
     // seconds: 1640995200
     private static long shift = 1640995200;
@@ -114,27 +128,26 @@ public class GraphActivity extends AppCompatActivity {
     // The best method would be to calculate shift so that min timestamp and max timestamp are on
     // the opposite site of number line -> their center is on 0
     private float millisToX(long milliseconds) {
-        return TimeUnit.MILLISECONDS.toSeconds(milliseconds) - shift;
+        return (float) TimeUnit.MILLISECONDS.toSeconds(milliseconds) - shift;
     }
 
     private long xToMillis(float x) {
-        return TimeUnit.SECONDS.toMillis((long) x) + shift;
+        return TimeUnit.SECONDS.toMillis(((long) x) + shift);
     }
 
 
     private LineData getLineDataSet() {
-
         ArrayList<Entry> values = new ArrayList<>();
-        long errorSum = 0;
+        //long errorSum = 0;
         WeightsValueProvider.getAllWeights(this, (timestamp, weight) -> {
             float y = Float.parseFloat(weight);
             float x = millisToX(timestamp);
-            long error = Math.abs(timestamp - xToMillis(millisToX(timestamp)));
+            //long error = Math.abs(timestamp - xToMillis(millisToX(timestamp)));
 
-            Log.d("Graph", "x:" + x + ", y:" + y + " " + timestamp + " " + error);
+            //Log.d("Graph", "x:" + x + ", y:" + y + " " + timestamp + " " + error);
             values.add(new Entry(x, y)); // add one entry per hour
         });
-        Log.d("Graph", "Error sum " + errorSum);
+        //Log.d("Graph", "Error sum " + errorSum);
 
         Collections.sort(values, (e1, e2) -> (int) (e1.getX() - e2.getX()));
 
