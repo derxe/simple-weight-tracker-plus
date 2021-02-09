@@ -335,8 +335,13 @@ public class MainActivity extends AppCompatActivity {
                 // Delete all records in app
                 getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
+                long updatedAt = System.currentTimeMillis();
                 for (WeightEntry e : resultList) {
-                    insertWeight(MainActivity.this, e.weight + "", e.timestamp);
+                    insertWeight(
+                            MainActivity.this,
+                            e.weight + "",
+                            e.timestamp,
+                            updatedAt);
                 }
             });
         }

@@ -189,8 +189,8 @@ public class AddWeightActivity extends AppCompatActivity {
         String weight = weightInput.getText().toString();
         if (validateWeightField()) {
             long timestamp = cal.getTimeInMillis();
-
-            insertWeight(this, weight, timestamp);
+            long updatedAt = System.currentTimeMillis();
+            insertWeight(this, weight, timestamp, updatedAt);
             finish();
         }
     }

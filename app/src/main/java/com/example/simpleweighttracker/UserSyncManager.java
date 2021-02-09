@@ -11,8 +11,10 @@ import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
+import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 
 import org.json.JSONArray;
@@ -27,9 +29,8 @@ public class UserSyncManager {
 
     Context context;
     String serverUrl;
-    String username = "linuxize";
-    String password = "pass";
-    String accessToken;
+    String username = "user2";
+    String password = "123";
 
     public interface OnAccessTokenReturn {
         void onAccessTokenReturn(String accessToken);
@@ -38,6 +39,12 @@ public class UserSyncManager {
     public UserSyncManager(Context context, String serverUrl) {
         this.context = context;
         this.serverUrl = serverUrl;
+    }
+
+    private static Map<String, String> getHeaders(String accessToken) {
+        HashMap<String, String> headers = new HashMap<>();
+        headers.put("x-access-token", accessToken);
+        return headers;
     }
 
     public static JsonObjectRequest getJSONReuqest(String accessToken,
@@ -49,10 +56,8 @@ public class UserSyncManager {
         return new JsonObjectRequest(method, url, jsonRequest, listener, errorListener) {
             /** Passing some request headers* */
             @Override
-            public Map getHeaders() throws AuthFailureError {
-                HashMap headers = new HashMap();
-                headers.put("x-access-token", accessToken);
-                return headers;
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                return UserSyncManager.getHeaders(accessToken);
             }
         };
     }
@@ -66,10 +71,8 @@ public class UserSyncManager {
         return new JsonArrayRequest(method, url, jsonRequest, listener, errorListener) {
             /** Passing some request headers* */
             @Override
-            public Map getHeaders() throws AuthFailureError {
-                HashMap headers = new HashMap();
-                headers.put("x-access-token", accessToken);
-                return headers;
+            public Map<String, String> getHeaders() throws AuthFailureError {
+                return UserSyncManager.getHeaders(accessToken);
             }
         };
     }
@@ -103,10 +106,21 @@ public class UserSyncManager {
                         returnFun.onAccessTokenReturn(null);
                     }
                 }, error -> {
-                    Log.e(TAG, "Login filed: " + error.toString());
+                    Log.e(TAG, "Login filed: " + error.toString() + " Message:" + getMessage(error));
                     error.printStackTrace();
                     returnFun.onAccessTokenReturn(null);
                 }));
+    }
+
+    private String getMessage(VolleyError error) {
+        String message = error.getMessage();
+        if(message == null) {
+            try {
+                byte[] htmlBodyBytes = error.networkResponse.data;
+                message = new String(htmlBodyBytes);
+            } catch (NullPointerException e) {}
+        }
+        return message;
     }
 
 

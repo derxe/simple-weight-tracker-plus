@@ -27,7 +27,7 @@ public class SyncManager {
     private static final String TAG = "SyncManager";
     Context context;
     //String serverUrl = "https://angular-tst.firebaseio.com/weightTracker";
-    String serverUrl = "http://192.168.1.76:8080";
+    String serverUrl = "http://192.168.1.6:8080";
     UserSyncManager user;
     long syncStart;
     private SyncResultListener onResultsListeners;
@@ -56,11 +56,8 @@ public class SyncManager {
         Log.d(TAG, "Uploading my data,");
 
         JSONObject weightsData = new JSONObject();
-        final int[] i = {0};
         WeightsValueProvider.getAllWeights(context, true, (timestamp, weight) -> {
             try {
-                i[0]++;
-                if (i[0] > 6) return;
                 weightsData.put(Long.toString(timestamp), weight);
             } catch (JSONException e) {
                 e.printStackTrace();
@@ -68,17 +65,25 @@ public class SyncManager {
         });
 
         int method = Request.Method.POST;
-        String url = serverUrl + "/api/weights";
+        String url = serverUrl + "/api/weights/short";
 
         Log.d(TAG, "Uploading data to the server.");
-        Log.d(TAG, "Url: " + url + " Data:" + weightsData.length() + " " + weightsData.toString());
+        Log.d(TAG, "Url: " + url + " Data:" + weightsData.length() );
+
         RequestQueue queue = Volley.newRequestQueue(context);
         queue.add(UserSyncManager.getJSONReuqest
             (accessToken, method, url, weightsData, response -> {
                 // success
-                Log.d("TAG", "Upload successful!: " + response.toString());
-                Log.d(TAG, "Upload successful!: " + response.toString().length());
+                Log.d(TAG, "Upload successful!: " + response.toString());
                 onSyncResult(true, "Sync successful");
+
+                try {
+                    JSONObject updatedAt = response.getJSONObject("updatedAt");
+                    long lastUpdateTime = updatedAt.getLong("timestamp");
+                    saveLastUpdateTime(lastUpdateTime);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }, error -> {
                 Log.e(TAG, "Failed uploading sync data: " + error.toString());
                 error.printStackTrace();
@@ -92,24 +97,20 @@ public class SyncManager {
         return response.optJSONObject("data");
     }
 
-    private void updateOrInsertWeights(JSONObject data) {
+    private void updateOrInsertWeights(JSONArray data, long updatedAt) {
         if (data == null) {
             Log.d(TAG, "No data to update. Data is null");
             return;
         }
         Log.d(TAG, "Updating weights, Len: " + data.length());
 
-        Iterator<String> keys = data.keys();
-        while (keys.hasNext()) {
+        for(int i=0; i<data.length(); i++) {
             try {
-                String key = keys.next();
-                Long timestamp = Long.parseLong(key);
-                String weight = (String) data.get(key);
-                if (timestamp == null) {
-                    Log.e(TAG, "Unable to insert weight: " + weight + " timestamp:" + timestamp + " key:" + key);
-                } else {
-                    WeightsValueProvider.updateOrInsertWeight(context, weight, timestamp);
-                }
+                JSONObject weightObj = data.getJSONObject(i);
+                Long timestamp = Long.parseLong(weightObj.getString("timestamp_id"));
+                String weight = weightObj.getString("weight");
+
+                WeightsValueProvider.updateOrInsertWeight(context, weight, timestamp, updatedAt);
             } catch (JSONException e) {
                 e.printStackTrace();
             } catch (NumberFormatException e) {
@@ -119,7 +120,7 @@ public class SyncManager {
         Log.d(TAG, "Updating weights finished");
     }
 
-    private void insertWeights(JSONObject data) {
+    private void insertWeights(JSONObject data, long updatedAt) {
         if (data == null) {
             Log.d(TAG, "No data to insert. Data is null");
             return;
@@ -130,7 +131,11 @@ public class SyncManager {
             String timestamp = keys.next();
             try {
                 String weight = (String) data.get(timestamp);
-                WeightsValueProvider.insertWeight(context, weight + "", Long.parseLong(timestamp));
+                WeightsValueProvider.insertWeight(
+                        context,
+                        weight + "",
+                        Long.parseLong(timestamp),
+                        updatedAt);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -160,12 +165,23 @@ public class SyncManager {
             }
 
             String url = serverUrl + "/api/weights";
+
+            long lastUpdateTime = getLastUpdateTime();
+            if(lastUpdateTime != -1) {
+                url += "?unix_after=" + lastUpdateTime;
+            } else {
+                Log.d(TAG, "LastUpdateTime not defined, Downloading all the data.");
+            }
             Log.d(TAG, "Getting data from the server url: " + url);
             RequestQueue queue = Volley.newRequestQueue(context);
             queue.add(UserSyncManager.getJSONArrayReuqest(accessToken, Request.Method.GET, url, null,
                 (JSONArray response) -> {
-                    Log.d(TAG, "Got data from the server: " + response.length());
-                    Log.d(TAG, "Got data from the server: " + response.toString());
+                    Log.d(TAG, "Got data from the server: len" + response.length() + ": " + response.toString());
+
+                    // TODO save data here
+                    updateOrInsertWeights(response, System.currentTimeMillis());
+
+                    saveLastUpdateTime(lastUpdateTime);
 
                     syncUpload(accessToken);
                 },
@@ -177,6 +193,16 @@ public class SyncManager {
         });
     }
 
+    private void saveLastUpdateTime(long lastUpdateTime) {
+        Log.v(TAG, "Setting new lastUpdateTime: " + lastUpdateTime);
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        sp.edit().putLong("lastUpdateTime", lastUpdateTime).apply();
+    }
+
+    private long getLastUpdateTime() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        return sp.getLong("lastUpdateTime", -1);
+    }
 
 
     /**
@@ -214,7 +240,8 @@ public class SyncManager {
             context.getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
             // insert all the new data from the server
-            insertWeights(serverData);
+            long updatedAt = System.currentTimeMillis();
+            insertWeights(serverData, updatedAt);
             onSyncResult(true, "Sync successful");
         });
 /*
