@@ -19,6 +19,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.Locale;
 
@@ -27,7 +30,7 @@ public class SyncManager {
     private static final String TAG = "SyncManager";
     Context context;
     //String serverUrl = "https://angular-tst.firebaseio.com/weightTracker";
-    String serverUrl = "http://192.168.1.6:8080";
+    String serverUrl = "http://192.168.1.10:8080";
     UserSyncManager user;
     long syncStart;
     private SyncResultListener onResultsListeners;
@@ -97,30 +100,35 @@ public class SyncManager {
         return response.optJSONObject("data");
     }
 
-    private void updateOrInsertWeights(JSONArray data, long updatedAt) {
+    private void updateOrInsertWeights(JSONArray data) {
         if (data == null) {
             Log.d(TAG, "No data to update. Data is null");
             return;
         }
         Log.d(TAG, "Updating weights, Len: " + data.length());
 
+        //SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.ENGLISH);
         for(int i=0; i<data.length(); i++) {
             try {
                 JSONObject weightObj = data.getJSONObject(i);
-                Long timestamp = Long.parseLong(weightObj.getString("timestamp_id"));
+                long timestamp = Long.parseLong(weightObj.getString("timestamp_id"));
                 String weight = weightObj.getString("weight");
+                //String updatedAtStr = weightObj.getString("updatedAt");
+                //long updatedAt = format.parse(updatedAtStr).getTime();
 
-                WeightsValueProvider.updateOrInsertWeight(context, weight, timestamp, updatedAt);
+                WeightsValueProvider.insertOrUpdate(context, weight, timestamp);
             } catch (JSONException e) {
                 e.printStackTrace();
             } catch (NumberFormatException e) {
+                e.printStackTrace();
+            } catch (ParseException e) {
                 e.printStackTrace();
             }
         }
         Log.d(TAG, "Updating weights finished");
     }
 
-    private void insertWeights(JSONObject data, long updatedAt) {
+    private void insertWeights(JSONObject data) {
         if (data == null) {
             Log.d(TAG, "No data to insert. Data is null");
             return;
@@ -134,8 +142,7 @@ public class SyncManager {
                 WeightsValueProvider.insertWeight(
                         context,
                         weight + "",
-                        Long.parseLong(timestamp),
-                        updatedAt);
+                        Long.parseLong(timestamp));
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -177,12 +184,7 @@ public class SyncManager {
             queue.add(UserSyncManager.getJSONArrayReuqest(accessToken, Request.Method.GET, url, null,
                 (JSONArray response) -> {
                     Log.d(TAG, "Got data from the server: len" + response.length() + ": " + response.toString());
-
-                    // TODO save data here
-                    updateOrInsertWeights(response, System.currentTimeMillis());
-
-                    saveLastUpdateTime(lastUpdateTime);
-
+                    updateOrInsertWeights(response);
                     syncUpload(accessToken);
                 },
                 (Response.ErrorListener) error -> {
@@ -240,8 +242,7 @@ public class SyncManager {
             context.getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
             // insert all the new data from the server
-            long updatedAt = System.currentTimeMillis();
-            insertWeights(serverData, updatedAt);
+            insertWeights(serverData);
             onSyncResult(true, "Sync successful");
         });
 /*

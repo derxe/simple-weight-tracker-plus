@@ -171,7 +171,7 @@ public class AddWeightActivity extends AppCompatActivity {
     }
 
     private void deleteWeightAndFinish() {
-        deleteWeightWithId(this, weight.id);
+        deleteWeightWithTimestamp(this, weight.timestamp);
         finish();
     }
 
@@ -180,7 +180,7 @@ public class AddWeightActivity extends AppCompatActivity {
         if (validateWeightField()) {
             long timestamp = cal.getTimeInMillis();
 
-            updateWeightWithId(this, weight.id, weightValue, timestamp);
+            updateWeight(this, weight.timestamp, weightValue);
             finish();
         }
     }
@@ -189,8 +189,7 @@ public class AddWeightActivity extends AppCompatActivity {
         String weight = weightInput.getText().toString();
         if (validateWeightField()) {
             long timestamp = cal.getTimeInMillis();
-            long updatedAt = System.currentTimeMillis();
-            insertWeight(this, weight, timestamp, updatedAt);
+            insertWeight(this, weight, timestamp);
             finish();
         }
     }

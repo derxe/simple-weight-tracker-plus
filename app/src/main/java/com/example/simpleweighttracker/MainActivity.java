@@ -50,6 +50,8 @@ import java.util.Date;
 import java.util.Locale;
 
 import static androidx.appcompat.app.AlertDialog.Builder;
+import static com.example.simpleweighttracker.WeightsValueProvider.TIMESTAMP;
+import static com.example.simpleweighttracker.WeightsValueProvider.VALUE;
 import static com.example.simpleweighttracker.WeightsValueProvider.insertWeight;
 
 
@@ -77,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Weight weight = WeightsValueProvider.getWeightById(MainActivity.this, id);
+                Weight weight = WeightsValueProvider.getWeightByTimestamp(MainActivity.this, id);
                 Bundle bundle = new Bundle();
                 bundle.putSerializable("weight", weight);
                 Intent intent = new Intent(getApplicationContext(), AddWeightActivity.class);
@@ -103,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
             @NonNull
             @Override
             public Loader<Cursor> onCreateLoader(int id, @Nullable Bundle args) {
-                String[] projection = {"_id", "value", "timestamp"};
+                String[] projection = {VALUE, TIMESTAMP};
 
                 String selection = "value != ''"; // don't show deleted values
                 return new CursorLoader(MainActivity.this,
@@ -335,13 +337,11 @@ public class MainActivity extends AppCompatActivity {
                 // Delete all records in app
                 getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
 
-                long updatedAt = System.currentTimeMillis();
                 for (WeightEntry e : resultList) {
                     insertWeight(
                             MainActivity.this,
                             e.weight + "",
-                            e.timestamp,
-                            updatedAt);
+                            e.timestamp);
                 }
             });
         }
@@ -431,11 +431,11 @@ public class MainActivity extends AppCompatActivity {
             TextView timestampLabel = view.findViewById(R.id.timestamp);
 
             // set value label
-            final String value = cursor.getString(cursor.getColumnIndex("value"));
+            final String value = cursor.getString(cursor.getColumnIndex(VALUE));
             weightLabel.setText(value);
 
             // set the timestamp label
-            long timeMs = cursor.getLong(cursor.getColumnIndex("timestamp"));
+            long timeMs = cursor.getLong(cursor.getColumnIndex(TIMESTAMP));
             Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(timeMs);
             DateFormat dateFormat = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault());
