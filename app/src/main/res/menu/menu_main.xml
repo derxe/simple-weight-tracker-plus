@@ -29,5 +29,10 @@
         android:title="Settings"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/clear_all"
+        android:title="Clear ALL data"
+        app:showAsAction="never" />
+
 
 </menu>

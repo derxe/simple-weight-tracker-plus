@@ -1,4 +1,4 @@
-package com.example.simpleweighttracker;
+package com.example.simpleweighttracker.Data;
 
 import android.content.ContentProvider;
 import android.content.ContentProviderClient;
@@ -15,29 +15,33 @@ import android.net.Uri;
 import android.text.TextUtils;
 import android.util.Log;
 
+import androidx.annotation.NonNull;
+
 import java.io.Serializable;
 import java.util.List;
+import java.util.Locale;
 
 public class WeightsValueProvider extends ContentProvider {
     // fields for my content provider
-    static final String PROVIDER_NAME = "com.simpleweighttracker.tracker";
-    static final String URL = "content://" + PROVIDER_NAME + "/values";
-    static final Uri CONTENT_URI = Uri.parse(URL);
+    public static final String PROVIDER_NAME = "com.simpleweighttracker.tracker";
+    public static final String URL = "content://" + PROVIDER_NAME + "/values";
+    public static final Uri CONTENT_URI = Uri.parse(URL);
 
     // fields for the database
-    static final String VALUE = "value";
-    static final String TIMESTAMP = "_id";
-    static final String UPDATED_AT = "updatedAt";
+    public static final String VALUE = "value";
+    public static final String TIMESTAMP = "_id";
+    public static final String UPDATED_AT = "updatedAt";
 
     // integer values used in content URI
-    static final int VALUES = 1;
-    static final int VALUE_ID = 2;
+    public static final int VALUES = 1;
+    public static final int VALUE_ID = 2;
 
     DBHelper dbHelper;
 
     // maps content URI "patterns" to the integer values that were set above
     static final UriMatcher uriMatcher;
-    static{
+
+    static {
         uriMatcher = new UriMatcher(UriMatcher.NO_MATCH);
         uriMatcher.addURI(PROVIDER_NAME, "values", VALUES);
         uriMatcher.addURI(PROVIDER_NAME, "values/#", VALUE_ID);
@@ -49,40 +53,26 @@ public class WeightsValueProvider extends ContentProvider {
     static final String TABLE_NAME = "tracker";
     static final int DATABASE_VERSION = 1;
 
-    // class that creates and manages the provider's database
-    private static class DBHelper extends SQLiteOpenHelper {
-
-        public DBHelper(Context context) {
-            super(context, DATABASE_NAME, null, DATABASE_VERSION);
-        }
-
-        @Override
-        public void onCreate(SQLiteDatabase db) {
-            String sqlCreate = "CREATE TABLE " + TABLE_NAME + " (" +
-                    TIMESTAMP + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    VALUE + " REAL NOT NULL, " +
-                    UPDATED_AT + " INTEGER " +
-                    ");";
-            //sqlCreate += "create index timestamp on " + TABLE_NAME + " (timestamp);";
-
-            db.execSQL(sqlCreate);
-        }
-
-        @Override
-        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-            Log.w(DBHelper.class.getName(),
-                    "Upgrading database from version " + oldVersion + " to "
-                            + newVersion + ". Old data will be destroyed");
-            db.execSQL("DROP TABLE IF EXISTS " +  TABLE_NAME);
-            onCreate(db);
-        }
-
+    public static void insertWeight(Context context, long timestamp, String value) {
+        ContentValues values = new ContentValues();
+        values.put(VALUE, value);
+        values.put(TIMESTAMP, timestamp);
+        values.put(UPDATED_AT, System.currentTimeMillis());
+        context.getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
     }
 
-    public static class Weight implements Serializable {
-        String weight;
-        long timestamp;
-        long updatedAt;
+    public static Weight getWeightByTimestamp(Context context, long timestamp) {
+        Cursor cursor = context.getContentResolver().query(
+                WeightsValueProvider.CONTENT_URI,
+                new String[]{VALUE, TIMESTAMP, UPDATED_AT},
+                TIMESTAMP + "= ?",
+                new String[]{String.valueOf(timestamp)},
+                TIMESTAMP + " ASC");
+        if (cursor == null) return null;
+
+        Weight weight = getWeightFromCursor(cursor);
+        cursor.close();
+        return weight;
     }
 
     private static Weight getWeightFromCursor(Cursor cursor) {
@@ -101,26 +91,28 @@ public class WeightsValueProvider extends ContentProvider {
         return weight;
     }
 
-    public static Weight getWeightByTimestamp(Context context, long timestamp) {
+    public static void getAllWeights(Context context, boolean includeDeleted, GetAllWeightsIterator responseFun) {
+        String selection = includeDeleted ? "" : VALUE + " != ''";
         Cursor cursor = context.getContentResolver().query(
-                WeightsValueProvider.CONTENT_URI,
-                new String[]{VALUE, TIMESTAMP, UPDATED_AT},
-                TIMESTAMP + "= ?",
-               new String[]{String.valueOf(timestamp)},
+                CONTENT_URI, new String[]{VALUE, TIMESTAMP, UPDATED_AT},
+                selection,
+                null,
                 TIMESTAMP + " ASC");
-        if(cursor == null) return null;
+        assert cursor != null;
 
-        Weight weight = getWeightFromCursor(cursor);
+        extractCursorValues(cursor, responseFun);
+
         cursor.close();
-        return weight;
     }
 
-    public static void insertWeight(Context context, String value, long timestamp) {
-        ContentValues values = new ContentValues();
-        values.put(VALUE, value);
-        values.put(TIMESTAMP, timestamp);
-        values.put(UPDATED_AT, System.currentTimeMillis());
-        context.getContentResolver().insert(WeightsValueProvider.CONTENT_URI, values);
+    /**
+     * Returns weights that are more recent then the updateTime provided
+     */
+    public static void getAllWeightsUpdateTime(Context context, long updateTime, GetAllWeightsIterator responseFun) {
+        String selection = UPDATED_AT + " > ?";
+        String[] selectionArgs = new String[]{String.valueOf(updateTime)};
+
+        getAllWeights(context, selection, selectionArgs, responseFun);
     }
 
     public static void deleteWeightWithTimestamp(Context context, long timestamp) {
@@ -150,34 +142,77 @@ public class WeightsValueProvider extends ContentProvider {
     }
     */
 
-    public interface GetAllWeightsIterator {
-        void weight(long timestamp, String weight);
-    }
-
     public static void getAllWeights(Context context, GetAllWeightsIterator responseFun) {
-        getAllWeights(context,  false, responseFun);
+        getAllWeights(context, false, responseFun);
     }
 
-    public static void getAllWeights(Context context, boolean includeDeleted, GetAllWeightsIterator responseFun) {
-        String selection = includeDeleted? "" : VALUE + " != ''";
+    public static void getAllWeights(Context context, String selection, String[] selectionArgs, GetAllWeightsIterator responseFun) {
         Cursor cursor = context.getContentResolver().query(
-                CONTENT_URI, new String[]{VALUE, TIMESTAMP},
+                CONTENT_URI, new String[]{VALUE, TIMESTAMP, UPDATED_AT},
                 selection,
-                null,
+                selectionArgs,
                 TIMESTAMP + " ASC");
         assert cursor != null;
 
+        extractCursorValues(cursor, responseFun);
+
+        cursor.close();
+    }
+
+    private static void extractCursorValues(Cursor cursor, GetAllWeightsIterator responseFun) {
         int timestampIndex = cursor.getColumnIndex(TIMESTAMP);
         int weightIndex = cursor.getColumnIndex(VALUE);
+        int updatedIndex = cursor.getColumnIndex(UPDATED_AT);
 
         while (cursor.moveToNext()) {
             long time = cursor.getLong(timestampIndex);
             String weight = cursor.getString(weightIndex);
+            long updatedAt = cursor.getLong(updatedIndex);
 
-            responseFun.weight(time, weight);
+            responseFun.weight(time, weight, updatedAt);
+        }
+    }
+
+    public static void insertOrUpdate(Context context, String value, long timestamp, long updatedAt) {
+        ContentProviderClient cpc = context.getContentResolver().acquireContentProviderClient(CONTENT_URI);
+        WeightsValueProvider cp = (WeightsValueProvider) cpc.getLocalContentProvider();
+
+        if (updatedAt == -1) updatedAt = System.currentTimeMillis();
+        ContentValues values = new ContentValues();
+        values.put(VALUE, value);
+        values.put(TIMESTAMP, timestamp);
+        values.put(UPDATED_AT, updatedAt);
+        cp.insertOrUpdate(values);
+
+        cpc.release();
+    }
+
+    public static void insertOrUpdate(Context context, List<Weight> weights) {
+        ContentProviderClient cpc = context.getContentResolver().acquireContentProviderClient(CONTENT_URI);
+        WeightsValueProvider cp = (WeightsValueProvider) cpc.getLocalContentProvider();
+
+        ContentValues values = new ContentValues();
+        long updatedAt = System.currentTimeMillis();
+        for (Weight weight : weights) {
+            values.put(VALUE, weight.weight);
+            values.put(TIMESTAMP, weight.timestamp);
+            values.put(UPDATED_AT, updatedAt);
+            cp.insertOrUpdate(values);
         }
 
-        cursor.close();
+        cpc.release();
+    }
+
+    private void insertOrUpdate(ContentValues values) {
+        long row = database.insertWithOnConflict(
+                TABLE_NAME,
+                null,
+                values,
+                SQLiteDatabase.CONFLICT_REPLACE);
+        if (row <= 0) throw new SQLException("Fail to add a new record into " + TABLE_NAME);
+
+        Uri newUri = ContentUris.withAppendedId(CONTENT_URI, row);
+        notifyChange(newUri);
     }
 
     @Override
@@ -191,53 +226,58 @@ public class WeightsValueProvider extends ContentProvider {
 
     private void setNotificationUri(Cursor cursor, Uri uri) {
         Context context = getContext();
-        if(context != null) cursor.setNotificationUri(context.getContentResolver(), uri);
+        if (context != null) cursor.setNotificationUri(context.getContentResolver(), uri);
     }
 
     private void notifyChange(Uri uri) {
         Context context = getContext();
-        if(context != null) context.getContentResolver().notifyChange(uri, null);
+        if (context != null) context.getContentResolver().notifyChange(uri, null);
     }
 
-    public static void insertOrUpdate(Context context, List<Weight> weights) {
-        ContentProviderClient cpc = context.getContentResolver().acquireContentProviderClient(CONTENT_URI);
-        WeightsValueProvider cp = (WeightsValueProvider) cpc.getLocalContentProvider();
+    public interface GetAllWeightsIterator {
+        void weight(long timestamp, String weight, long updatedAt);
+    }
 
-        ContentValues values = new ContentValues();
-        long updatedAt = System.currentTimeMillis();
-        for(Weight weight: weights) {
-            values.put(VALUE, weight.weight);
-            values.put(TIMESTAMP, weight.timestamp);
-            values.put(UPDATED_AT, updatedAt);
-            cp.insertOrUpdate(values);
+    // class that creates and manages the provider's database
+    private static class DBHelper extends SQLiteOpenHelper {
+
+        public DBHelper(Context context) {
+            super(context, DATABASE_NAME, null, DATABASE_VERSION);
         }
 
-        cpc.release();
+        @Override
+        public void onCreate(SQLiteDatabase db) {
+            String sqlCreate = "CREATE TABLE " + TABLE_NAME + " (" +
+                    TIMESTAMP + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    VALUE + " REAL NOT NULL, " +
+                    UPDATED_AT + " INTEGER " +
+                    ");";
+            //sqlCreate += "create index timestamp on " + TABLE_NAME + " (timestamp);";
+
+            db.execSQL(sqlCreate);
+        }
+
+        @Override
+        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            Log.w(DBHelper.class.getName(),
+                    "Upgrading database from version " + oldVersion + " to "
+                            + newVersion + ". Old data will be destroyed");
+            db.execSQL("DROP TABLE IF EXISTS " + TABLE_NAME);
+            onCreate(db);
+        }
+
     }
 
-    public static void insertOrUpdate(Context context, String value, long timestamp) {
-        ContentProviderClient cpc = context.getContentResolver().acquireContentProviderClient(CONTENT_URI);
-        WeightsValueProvider cp = (WeightsValueProvider) cpc.getLocalContentProvider();
+    public static class Weight implements Serializable {
+        String weight;
+        long timestamp;
+        long updatedAt;
 
-        ContentValues values = new ContentValues();
-        values.put(VALUE, value);
-        values.put(TIMESTAMP, timestamp);
-        values.put(UPDATED_AT, System.currentTimeMillis());
-        cp.insertOrUpdate(values);
-
-        cpc.release();
-    }
-
-    private void insertOrUpdate(ContentValues values){
-        long row = database.insertWithOnConflict(
-                TABLE_NAME,
-                null,
-                values,
-                SQLiteDatabase.CONFLICT_REPLACE);
-        if (row <= 0) throw new SQLException("Fail to add a new record into " + TABLE_NAME);
-
-        Uri newUri = ContentUris.withAppendedId(CONTENT_URI, row);
-        notifyChange(newUri);
+        @NonNull
+        @Override
+        public String toString() {
+            return String.format(Locale.ENGLISH, "%d %s %d", timestamp, weight, updatedAt);
+        }
     }
 
     @Override

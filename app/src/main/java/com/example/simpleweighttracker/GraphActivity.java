@@ -3,10 +3,10 @@ package com.example.simpleweighttracker;
 import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.simpleweighttracker.Data.WeightsValueProvider;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
@@ -139,7 +139,7 @@ public class GraphActivity extends AppCompatActivity {
     private LineData getLineDataSet() {
         ArrayList<Entry> values = new ArrayList<>();
         //long errorSum = 0;
-        WeightsValueProvider.getAllWeights(this, (timestamp, weight) -> {
+        WeightsValueProvider.getAllWeights(this, (timestamp, weight, updatedAt) -> {
             float y = Float.parseFloat(weight);
             float x = millisToX(timestamp);
             //long error = Math.abs(timestamp - xToMillis(millisToX(timestamp)));

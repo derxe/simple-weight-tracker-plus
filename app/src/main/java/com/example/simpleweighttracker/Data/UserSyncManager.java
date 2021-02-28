@@ -1,4 +1,4 @@
-package com.example.simpleweighttracker;
+package com.example.simpleweighttracker.Data;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -11,11 +11,10 @@ import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
-import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonArrayRequest;
 import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.example.simpleweighttracker.Utils;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -106,23 +105,17 @@ public class UserSyncManager {
                         returnFun.onAccessTokenReturn(null);
                     }
                 }, error -> {
-                    Log.e(TAG, "Login filed: " + error.toString() + " Message:" + getMessage(error));
+                    Log.e(TAG, "Login filed: " + error.toString() + " Message:" + Utils.getErrorMessage(error));
                     error.printStackTrace();
                     returnFun.onAccessTokenReturn(null);
                 }));
     }
 
-    private String getMessage(VolleyError error) {
-        String message = error.getMessage();
-        if(message == null) {
-            try {
-                byte[] htmlBodyBytes = error.networkResponse.data;
-                message = new String(htmlBodyBytes);
-            } catch (NullPointerException e) {}
-        }
-        return message;
-    }
 
+    public void clearAccessToken() {
+        SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);
+        sp.edit().remove("accessToken").apply();
+    }
 
     private void saveAccessToken(String accessToken) {
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(context);

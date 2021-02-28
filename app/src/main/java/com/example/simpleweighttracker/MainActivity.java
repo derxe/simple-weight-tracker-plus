@@ -1,7 +1,10 @@
 package com.example.simpleweighttracker;
 
 import android.Manifest;
+import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.annotation.SuppressLint;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -34,7 +37,10 @@ import androidx.loader.content.CursorLoader;
 import androidx.loader.content.Loader;
 import androidx.preference.PreferenceManager;
 
-import com.example.simpleweighttracker.WeightsValueProvider.Weight;
+import com.example.simpleweighttracker.Data.AuthenticatorService;
+import com.example.simpleweighttracker.Data.SyncAdapter;
+import com.example.simpleweighttracker.Data.WeightsValueProvider;
+import com.example.simpleweighttracker.Data.WeightsValueProvider.Weight;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.BufferedReader;
@@ -50,9 +56,9 @@ import java.util.Date;
 import java.util.Locale;
 
 import static androidx.appcompat.app.AlertDialog.Builder;
-import static com.example.simpleweighttracker.WeightsValueProvider.TIMESTAMP;
-import static com.example.simpleweighttracker.WeightsValueProvider.VALUE;
-import static com.example.simpleweighttracker.WeightsValueProvider.insertWeight;
+import static com.example.simpleweighttracker.Data.WeightsValueProvider.TIMESTAMP;
+import static com.example.simpleweighttracker.Data.WeightsValueProvider.VALUE;
+import static com.example.simpleweighttracker.Data.WeightsValueProvider.insertWeight;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -67,12 +73,70 @@ public class MainActivity extends AppCompatActivity {
     ListView listView;
 
 
+    // An account type, in the form of a domain name
+    public static final String ACCOUNT_TYPE = "example.com";
+    // The account name
+    public static final String ACCOUNT = "placeholderaccount";
+
+    public static void CreateSyncAccount(Context context) {
+        boolean newAccount = false;
+        boolean setupComplete = PreferenceManager
+                .getDefaultSharedPreferences(context).getBoolean(PREF_SETUP_COMPLETE, false);
+        Account account = AuthenticatorService.GetAccount();
+        AccountManager accountManager = (AccountManager) context.getSystemService(Context.ACCOUNT_SERVICE);
+        if (accountManager.addAccountExplicitly(account, null, null)) {
+            ContentResolver.setIsSyncable(account, AUTHORITY, 1);
+            ContentResolver.setSyncAutomatically(account, AUTHORITY, true);
+            ContentResolver.addPeriodicSync(account,
+                    AUTHORITY,
+                    Bundle.EMPTY,
+                    Config.SYNC_PERIODIC_TIME);
+            newAccount = true;
+        }
+        if (newAccount || !setupComplete) {
+            PreferenceManager.getDefaultSharedPreferences(context).edit()
+                    .putBoolean(PREF_SETUP_COMPLETE, true).commit();
+        }
+    }
+
+    /**
+     * Create a new placeholder account for the sync adapter
+     *
+     * @param context The application context
+     */
+    public static Account CreateSyncAccount(Context context) {
+        // Create the account type and default account
+        Account newAccount = new Account(
+                ACCOUNT, ACCOUNT_TYPE);
+        // Get an instance of the Android account manager
+        AccountManager accountManager =
+                (AccountManager) context.getSystemService(ACCOUNT_SERVICE);
+        /*
+         * Add the account and account type, no password or user data
+         * If successful, return the Account object, otherwise report an error.
+         */
+        if (accountManager.addAccountExplicitly(newAccount, null, null)) {
+            /*
+             * If you don't set android:syncable="true" in
+             * in your <provider> element in the manifest,
+             * then call context.setIsSyncable(account, AUTHORITY, 1)
+             * here.
+             */
+        } else {
+            /*
+             * The account exists or some other error occurred. Log this, report it,
+             * or handle it internally.
+             */
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Utils.setTheme(this);
         setContentView(R.layout.activity_main);
         PreferenceManager.setDefaultValues(this, R.xml.root_preferences, false);
+        loadSync();
 
         listView = findViewById(R.id.list);
         loadData();
@@ -95,6 +159,10 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(view -> {
             startActivity(new Intent(MainActivity.this, AddWeightActivity.class));
         });
+    }
+
+    public void loadSync() {
+
     }
 
     public void loadData() {
@@ -141,6 +209,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         Context context = MainActivity.this;
 
+        SyncAdapter syncManager;
         switch (item.getItemId()) {
             case R.id.settings:
                 startActivity(new Intent(context, SettingsActivity.class));
@@ -161,12 +230,31 @@ public class MainActivity extends AppCompatActivity {
                 break;
 
             case R.id.sync:
-                SyncManager syncManager = new SyncManager(this);
+                syncManager = new SyncAdapter(this);
                 syncManager.setOnResultListener((success, message) -> {
                     Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
                 });
                 syncManager.sync();
                 break;
+
+            case R.id.clear_all:
+                syncManager = new SyncAdapter(this);
+
+                Builder b = new Builder(this);
+                b.setTitle("Deleting records");
+                b.setMessage("This will DELETE any records already in the app or on the server.");
+                b.setPositiveButton("Cancel", (dialogInterface, which) -> {
+                });
+                b.setNegativeButton("Delete", (dialogInterface, i) -> {
+                    syncManager.clearLastUpdateTime();
+                    syncManager.user.clearAccessToken();
+                    getContentResolver().delete(WeightsValueProvider.CONTENT_URI, null, null);
+                });
+                b.show();
+
+                syncManager.sync();
+                break;
+
 
             default:
                 return super.onOptionsItemSelected(item);
@@ -174,6 +262,7 @@ public class MainActivity extends AppCompatActivity {
 
         return true;
     }
+
 
     private void userSelectDirectory() {
         Uri downloadsUri = Uri.fromFile(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS));
@@ -238,7 +327,7 @@ public class MainActivity extends AppCompatActivity {
         SimpleDateFormat sdf = new SimpleDateFormat(format, locale);
 
         StringBuilder sb = new StringBuilder();
-        WeightsValueProvider.getAllWeights(this, (timestamp, weight) -> {
+        WeightsValueProvider.getAllWeights(this, (timestamp, weight, updatedAt) -> {
             cal.setTimeInMillis(timestamp);
             String timestampStr = sdf.format(cal.getTime());
             sb.append(String.format("%s,%s\n", timestampStr, weight));
@@ -340,8 +429,8 @@ public class MainActivity extends AppCompatActivity {
                 for (WeightEntry e : resultList) {
                     insertWeight(
                             MainActivity.this,
-                            e.weight + "",
-                            e.timestamp);
+                            e.timestamp,
+                            e.weight + "");
                 }
             });
         }

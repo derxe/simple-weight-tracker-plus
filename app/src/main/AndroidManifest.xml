@@ -37,8 +37,33 @@
         <activity android:name="net.rdrei.android.dirchooser.DirectoryChooserActivity" />
 
         <provider
-            android:name=".WeightsValueProvider"
-            android:authorities="com.simpleweighttracker.tracker" />
+            android:name=".Data.WeightsValueProvider"
+            android:authorities="com.simpleweighttracker.tracker"
+            android:exported="false"
+            android:syncable="true" />
+
+        <service android:name=".Data.AuthenticatorService">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+
+        <service
+            android:name=".Data.SyncService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/syncadapter" />
+        </service>
+
 
         <receiver android:name=".SimpleWidgetProvider">
             <intent-filter>

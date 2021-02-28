@@ -18,7 +18,7 @@ import java.util.Calendar;
 import java.util.Locale;
 
 import static android.text.format.DateFormat.is24HourFormat;
-import static com.example.simpleweighttracker.WeightsValueProvider.*;
+import static com.example.simpleweighttracker.Data.WeightsValueProvider.*;
 
 public class AddWeightActivity extends AppCompatActivity {
 
@@ -180,7 +180,12 @@ public class AddWeightActivity extends AppCompatActivity {
         if (validateWeightField()) {
             long timestamp = cal.getTimeInMillis();
 
-            updateWeight(this, weight.timestamp, weightValue);
+            if (weight.timestamp != timestamp) {
+                deleteWeightWithTimestamp(this, weight.timestamp);
+                insertWeight(this, timestamp, weightValue);
+            } else {
+                updateWeight(this, weight.timestamp, weightValue);
+            }
             finish();
         }
     }
@@ -189,7 +194,7 @@ public class AddWeightActivity extends AppCompatActivity {
         String weight = weightInput.getText().toString();
         if (validateWeightField()) {
             long timestamp = cal.getTimeInMillis();
-            insertWeight(this, weight, timestamp);
+            insertWeight(this, timestamp, weight);
             finish();
         }
     }

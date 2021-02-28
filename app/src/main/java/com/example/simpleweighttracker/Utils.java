@@ -14,9 +14,23 @@ import androidx.annotation.ColorInt;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.preference.PreferenceManager;
 
+import com.android.volley.VolleyError;
+
 import java.util.Locale;
 
 public class Utils {
+
+    public static String getErrorMessage(VolleyError error) {
+        String message = error.getMessage();
+        if (message == null) {
+            try {
+                byte[] htmlBodyBytes = error.networkResponse.data;
+                message = new String(htmlBodyBytes);
+            } catch (NullPointerException e) {
+            }
+        }
+        return message;
+    }
 
     public static Locale getDateLocale(Context context) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
